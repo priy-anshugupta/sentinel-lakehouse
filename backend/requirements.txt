@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+duckdb
+river
+mlxtend
+pandas
+numpy
+python-multipart
+aiofiles
