@@ -4,12 +4,13 @@
 
 | Field | Detail |
 |:---|:---|
-| **Version** | 1.0.0 |
-| **Status** | Implementation-Ready |
+| **Version** | 1.2.0 (Enterprise Edition) |
+| **Status** | Production & Deployed (Verified) |
 | **Team** | Priyanshu Gupta (24101B0037) · Ronak Boddu (24101B0044) · Nikhat Momin (24101B0054) |
 | **Course** | Data Warehousing & Mining (DWM) |
-| **Stack** | FastAPI · React (Vite) · DuckDB · river · mlxtend · Recharts |
+| **Stack** | FastAPI · React 18 (Vite) · DuckDB · River · MLxtend · Recharts · Tailwind CSS |
 | **Dataset** | PaySim — 6,362,620 synthetic financial transactions |
+| **Repository** | https://github.com/priy-anshugupta/sentinel-lakehouse |
 
 ---
 
