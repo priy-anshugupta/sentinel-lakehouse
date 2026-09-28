@@ -2,6 +2,15 @@ import duckdb
 import time
 from typing import Tuple, List, Dict, Any, Optional
 
+# PaySim steps represent simulated hours. A month here is a fixed 30-day
+# simulation bucket, not a calendar month.
+TIME_EXPRESSIONS = {
+    'HOUR': 'dt.hour_of_day',
+    'DAY': 'dt.day_number',
+    'WEEK': 'dt.week_number',
+    'MONTH': 'CAST(FLOOR((ft.step_number - 1) / 720) AS INTEGER) + 1',
+}
+
 def _execute_timed(con: duckdb.DuckDBPyConnection, sql: str, params: tuple = ()) -> Tuple[List[Dict[str, Any]], str, float]:
     start_time = time.time()
     if params:
@@ -13,12 +22,12 @@ def _execute_timed(con: duckdb.DuckDBPyConnection, sql: str, params: tuple = ())
     
     return result.to_dict(orient='records'), sql, exec_ms
 
-def rollup_query(con: duckdb.DuckDBPyConnection, granularity: str, type_filter: Optional[str] = None, fraud_only: bool = False, is_night: Optional[bool] = None) -> Tuple[List[Dict[str, Any]], str, float]:
-    time_col = 'day_number' if granularity == 'DAY' else 'week_number' if granularity == 'WEEK' else 'hour_of_day'
+def rollup_query(con: duckdb.DuckDBPyConnection, granularity: str, type_filter: Optional[str] = None, fraud_only: bool = False, is_night: Optional[bool] = None, step_start: Optional[int] = None, step_end: Optional[int] = None) -> Tuple[List[Dict[str, Any]], str, float]:
+    time_expr = TIME_EXPRESSIONS[granularity]
     
     sql = f"""
         SELECT 
-            dt.{time_col} as period,
+            {time_expr} as period,
             COUNT(*) as tx_count,
             SUM(ft.amount) as total_amount,
             AVG(ft.amount) as avg_amount,
@@ -38,31 +47,34 @@ def rollup_query(con: duckdb.DuckDBPyConnection, granularity: str, type_filter: 
     if is_night is not None:
         sql += " AND dt.is_night = ?"
         params.append(is_night)
+    if step_start is not None:
+        sql += " AND ft.step_number >= ?"
+        params.append(step_start)
+    if step_end is not None:
+        sql += " AND ft.step_number <= ?"
+        params.append(step_end)
         
-    sql += f" GROUP BY dt.{time_col} ORDER BY dt.{time_col}"
+    sql += f" GROUP BY {time_expr} ORDER BY {time_expr}"
     
     return _execute_timed(con, sql, tuple(params))
 
-def drilldown_query(con: duckdb.DuckDBPyConnection, parent_value: int, parent_granularity: str, type_filter: Optional[str] = None, fraud_only: bool = False) -> Tuple[List[Dict[str, Any]], str, float]:
-    if parent_granularity == 'WEEK':
-        child_col = 'day_number'
-        parent_col = 'week_number'
-    elif parent_granularity == 'DAY':
-        child_col = 'hour_of_day'
-        parent_col = 'day_number'
-    else:
-        child_col = 'step'
-        parent_col = 'hour_of_day'
+def drilldown_query(con: duckdb.DuckDBPyConnection, parent_value: int, parent_granularity: str, type_filter: Optional[str] = None, fraud_only: bool = False, is_night: Optional[bool] = None) -> Tuple[List[Dict[str, Any]], str, float]:
+    hierarchy = {'MONTH': 'WEEK', 'WEEK': 'DAY', 'DAY': 'HOUR'}
+    if parent_granularity not in hierarchy:
+        raise ValueError('Hour is the deepest supported drill-down level')
+    child_expr = TIME_EXPRESSIONS[hierarchy[parent_granularity]]
+    parent_expr = TIME_EXPRESSIONS[parent_granularity]
         
     sql = f"""
         SELECT 
-            dt.{child_col} as child_period,
+            {child_expr} as child_period,
             COUNT(*) as tx_count,
-            SUM(ft.amount) as total_amount
+            SUM(ft.amount) as total_amount,
+            SUM(ft.is_fraud_actual) as fraud_count
         FROM fact_transactions ft
         JOIN dim_time dt ON ft.time_key = dt.time_key
         JOIN dim_transaction_type dtt ON ft.type_key = dtt.type_key
-        WHERE dt.{parent_col} = ?
+        WHERE {parent_expr} = ?
     """
     params = [parent_value]
     
@@ -71,19 +83,23 @@ def drilldown_query(con: duckdb.DuckDBPyConnection, parent_value: int, parent_gr
         params.append(type_filter)
     if fraud_only:
         sql += " AND ft.is_fraud_actual = 1"
+    if is_night is not None:
+        sql += " AND dt.is_night = ?"
+        params.append(is_night)
         
-    sql += f" GROUP BY dt.{child_col} ORDER BY dt.{child_col}"
+    sql += f" GROUP BY {child_expr} ORDER BY {child_expr}"
     
     return _execute_timed(con, sql, tuple(params))
 
 def slice_query(con: duckdb.DuckDBPyConnection, dimension: str, value: Any, granularity: str) -> Tuple[List[Dict[str, Any]], str, float]:
-    time_col = 'day_number' if granularity == 'DAY' else 'week_number' if granularity == 'WEEK' else 'hour_of_day'
+    time_expr = TIME_EXPRESSIONS[granularity]
     
     sql = f"""
         SELECT 
-            dt.{time_col} as period,
+            {time_expr} as period,
             COUNT(*) as tx_count,
-            SUM(ft.amount) as total_amount
+            SUM(ft.amount) as total_amount,
+            SUM(ft.is_fraud_actual) as fraud_count
         FROM fact_transactions ft
         JOIN dim_time dt ON ft.time_key = dt.time_key
         JOIN dim_transaction_type dtt ON ft.type_key = dtt.type_key
@@ -100,18 +116,19 @@ def slice_query(con: duckdb.DuckDBPyConnection, dimension: str, value: Any, gran
     else:
         sql += " WHERE 1=0" 
         
-    sql += f" GROUP BY dt.{time_col} ORDER BY dt.{time_col}"
+    sql += f" GROUP BY {time_expr} ORDER BY {time_expr}"
     return _execute_timed(con, sql, tuple(params))
 
 def dice_query(con: duckdb.DuckDBPyConnection, type_filter_list: List[str], fraud_only: bool, is_night: Optional[bool], step_start: Optional[int], step_end: Optional[int], granularity: str) -> Tuple[List[Dict[str, Any]], str, float]:
-    time_col = 'day_number' if granularity == 'DAY' else 'week_number' if granularity == 'WEEK' else 'hour_of_day'
+    time_expr = TIME_EXPRESSIONS[granularity]
     
     sql = f"""
         SELECT 
-            dt.{time_col} as period,
+            {time_expr} as period,
             dtt.type_name,
             COUNT(*) as tx_count,
-            SUM(ft.amount) as total_amount
+            SUM(ft.amount) as total_amount,
+            SUM(ft.is_fraud_actual) as fraud_count
         FROM fact_transactions ft
         JOIN dim_time dt ON ft.time_key = dt.time_key
         JOIN dim_transaction_type dtt ON ft.type_key = dtt.type_key
@@ -139,7 +156,7 @@ def dice_query(con: duckdb.DuckDBPyConnection, type_filter_list: List[str], frau
         sql += " AND ft.step_number <= ?"
         params.append(step_end)
         
-    sql += f" GROUP BY dt.{time_col}, dtt.type_name ORDER BY dt.{time_col}, dtt.type_name"
+    sql += f" GROUP BY {time_expr}, dtt.type_name ORDER BY {time_expr}, dtt.type_name"
     return _execute_timed(con, sql, tuple(params))
 
 def pivot_query(con: duckdb.DuckDBPyConnection, row_dim: str = "day_of_week", col_dim: str = "type_name", measure: str = "amount") -> Tuple[List[Dict[str, Any]], str, float]:
