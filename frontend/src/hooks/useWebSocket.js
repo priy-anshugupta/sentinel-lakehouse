@@ -8,11 +8,15 @@ export const useWebSocket = () => {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
+  const activeRef = useRef(true);
 
   const connect = useCallback(() => {
+    if (!activeRef.current) return;
     try {
       setConnectionStatus('Connecting');
-      wsRef.current = new WebSocket(WS_URL);
+      const token = sessionStorage.getItem('sentinel_token');
+      if (!token) { setConnectionStatus('Closed'); return; }
+      wsRef.current = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
 
       wsRef.current.onopen = () => {
         setIsConnected(true);
@@ -32,7 +36,7 @@ export const useWebSocket = () => {
       wsRef.current.onclose = () => {
         setIsConnected(false);
         setConnectionStatus('Closed');
-        scheduleReconnect();
+        if (activeRef.current) scheduleReconnect();
       };
 
       wsRef.current.onerror = (error) => {
@@ -50,6 +54,7 @@ export const useWebSocket = () => {
   }, []);
 
   const scheduleReconnect = () => {
+    if (!activeRef.current) return;
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
@@ -64,8 +69,10 @@ export const useWebSocket = () => {
   };
 
   useEffect(() => {
+    activeRef.current = true;
     connect();
     return () => {
+      activeRef.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }

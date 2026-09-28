@@ -9,8 +9,9 @@ export const useOlapQuery = (params, debounceMs = 200) => {
   const [error, setError] = useState(null);
   
   const timeoutRef = useRef(null);
+  const requestIdRef = useRef(0);
 
-  const executeQuery = useCallback(async (queryParams) => {
+  const executeQuery = useCallback(async (queryParams, requestId = ++requestIdRef.current) => {
     if (!queryParams) return;
     
     setIsLoading(true);
@@ -27,14 +28,19 @@ export const useOlapQuery = (params, debounceMs = 200) => {
       } else {
         result = await fetchOlapQuery(queryParams);
       }
-      setData(result?.data || []);
-      setSql(result?.sql || '');
-      setExecutionMs(result?.execution_ms || 12.5);
+      if (requestId === requestIdRef.current) {
+        setData(result?.data || []);
+        setSql(result?.sql || '');
+        setExecutionMs(result?.execution_ms ?? null);
+      }
     } catch (err) {
       console.warn("OLAP Query Error:", err);
-      setError(err.response?.data?.message || err.message || 'An error occurred');
+      const detail = err.response?.data?.detail;
+      if (requestId === requestIdRef.current) setError(typeof detail === 'string' ? detail : Array.isArray(detail)
+        ? detail.map(item => item.msg || 'Invalid query parameter').join('; ')
+        : err.message || 'An error occurred');
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   }, []);
 
@@ -47,8 +53,15 @@ export const useOlapQuery = (params, debounceMs = 200) => {
       clearTimeout(timeoutRef.current);
     }
 
+    const requestId = ++requestIdRef.current;
+    setData(null);
+    setSql(null);
+    setExecutionMs(null);
+    setError(null);
+    setIsLoading(Boolean(params));
+
     timeoutRef.current = setTimeout(() => {
-      executeQuery(params);
+      executeQuery(params, requestId);
     }, debounceMs);
 
     return () => {
