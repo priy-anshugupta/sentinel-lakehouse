@@ -1,5 +1,4 @@
 import json
-import time
 from fastapi import APIRouter, Request, HTTPException
 from typing import List, Dict, Any
 from app.models.schemas import MiningParams, RuleDiffResult
@@ -7,6 +6,28 @@ from app.warehouse.connection import get_connection
 from app.intelligence.rule_miner import mine_drift_rules
 
 router = APIRouter()
+
+@router.get("/api/mining/drift-comparison/{drift_id}")
+async def compare_drift(drift_id: int, window: int = 100):
+    """Compare equal simulation-step windows around an observed drift event."""
+    if window < 10 or window > 500:
+        raise HTTPException(status_code=400, detail="Window must be 10–500 steps")
+    con = get_connection()
+    event = con.execute("SELECT detected_at_step FROM fact_drift_events WHERE drift_id=?", [drift_id]).fetchone()
+    if not event:
+        raise HTTPException(status_code=404, detail="Drift event not found")
+    step = event[0]
+    rows = con.execute("""
+        SELECT CASE WHEN f.step_number < ? THEN 'before' ELSE 'after' END AS period,
+          t.type_name AS type, count(*) AS transactions,
+          coalesce(sum(f.is_fraud_actual),0) AS confirmed,
+          coalesce(sum(f.is_fraud_pred),0) AS flagged
+        FROM fact_transactions f JOIN dim_transaction_type t ON f.type_key=t.type_key
+        WHERE f.step_number >= ? AND f.step_number < ?
+        GROUP BY 1,2 ORDER BY 1,2
+    """, [step, max(0,step-window), step+window]).fetchall()
+    return {"drift_id":drift_id,"step":step,"window":window,
+        "rows":[dict(zip(("period","type","transactions","confirmed","flagged"),r)) for r in rows]}
 
 @router.get("/api/mining/drift-events")
 async def get_drift_events(request: Request):
@@ -38,21 +59,6 @@ async def get_drift_events(request: Request):
                     "rules_summary": rules_summary
                 })
         
-        # Add detector drift events if any
-        app_state = request.app.state
-        detector = getattr(app_state, 'drift_detector', None)
-        if detector and getattr(detector, 'drift_events', None):
-            for d in detector.drift_events:
-                events.append({
-                    "drift_id": len(events) + 1,
-                    "detected_at_step": d.get("drift_step", 350),
-                    "detected_at_ts": str(d.get("detected_at", time.time())),
-                    "error_rate_before": d.get("error_rate_before", 0.021),
-                    "error_rate_after": d.get("error_rate_after", 0.183),
-                    "is_injected": False,
-                    "rules_summary": {}
-                })
-            
         return events
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

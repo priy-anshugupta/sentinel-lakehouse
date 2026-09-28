@@ -5,11 +5,16 @@ from app.warehouse.connection import get_connection
 from app.ingestion.manual_scorer import score_single_transaction
 from app.models.schemas import TransactionInput
 from app.intelligence.rule_miner import mine_drift_rules
+from app.auth import websocket_user
 
 router = APIRouter()
 
 @router.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
+    user = websocket_user(websocket)
+    if not user or user['role'] == 'BRANCH_MANAGER':
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     app_state = websocket.app.state
     simulator = app_state.simulator
@@ -48,11 +53,11 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Push metrics periodically
                     if simulator.total_yielded % 5 == 0:
                         clf = app_state.classifier
-                        acc = clf.rolling_accuracy.get() if clf and clf.total_samples > 10 else 0.974
+                        acc = clf.rolling_accuracy.get() if clf and clf.total_samples > 10 else None
                         await websocket.send_json({
                             "type": "metrics",
                             "data": {
-                                "accuracy": round(float(acc), 4),
+                                "accuracy": round(float(acc), 4) if acc is not None else None,
                                 "total_processed": simulator.total_yielded,
                                 "step": simulator.current_step,
                                 "drift_state": "drift_detected" if result.drift_detected else "monitoring"
@@ -109,7 +114,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "metrics",
                     "data": {
-                        "accuracy": 0.974,
+                        "accuracy": None,
                         "total_processed": 0,
                         "step": 1,
                         "drift_state": "idle"
