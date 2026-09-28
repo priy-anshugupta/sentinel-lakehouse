@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import DATA_DIR
-from app.warehouse.connection import init_warehouse
+from app.warehouse.connection import init_warehouse, close_connection
 from app.warehouse.etl import populate_dim_time
 from app.intelligence.stream_classifier import StreamClassifier
 from app.intelligence.drift_detector import DriftDetector
@@ -18,6 +18,8 @@ from app.routes.ingest import router as ingest_router
 from app.routes.warehouse_admin import router as admin_router
 from app.routes.stream_ws import router as ws_router
 from app.routes.stream_control import router as stream_control_router
+from app.auth import router as auth_router, request_user
+from fastapi.responses import JSONResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,8 +44,7 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Cleanup logic if any
-    pass
+    close_connection()
 
 app = FastAPI(title="SENTINEL Backend API", lifespan=lifespan)
 
@@ -55,8 +56,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def protect_api(request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/") or path in ("/api/health", "/api/auth/login", "/api/auth/me"):
+        return await call_next(request)
+    user = request_user(request)
+    if not user:
+        return JSONResponse({"detail": "Sign in required"}, status_code=401)
+    role = user["role"]
+    if path.startswith(("/api/warehouse", "/api/ingest")) and role != "DATA_ENGINEER":
+        return JSONResponse({"detail": "Engineer access required"}, status_code=403)
+    if path.startswith("/api/mining") and role == "BRANCH_MANAGER":
+        return JSONResponse({"detail": "Investigator access required"}, status_code=403)
+    if path.startswith("/api/stream/control") and role == "BRANCH_MANAGER":
+        return JSONResponse({"detail": "Investigator access required"}, status_code=403)
+    return await call_next(request)
+
 # Include routers
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(olap_router)
 app.include_router(mining_router)
 app.include_router(ingest_router)
