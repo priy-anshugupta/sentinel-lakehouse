@@ -1,69 +1,29 @@
-import React, { useState } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useState } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
-import { ROUTES } from './lib/constants';
 import { useRole } from './context/RoleContext';
+const CommandCenter = lazy(() => import('./pages/CommandCenter'));
+const OlapStudio = lazy(() => import('./pages/OlapStudio'));
+const StreamMonitor = lazy(() => import('./pages/StreamMonitor'));
+const RuleExplainer = lazy(() => import('./pages/RuleExplainer'));
+const WarehouseAdmin = lazy(() => import('./pages/WarehouseAdmin'));
+const IngestLab = lazy(() => import('./pages/IngestLab'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ReportBuilder = lazy(() => import('./pages/ReportBuilder'));
+const Glossary = lazy(() => import('./pages/Glossary'));
 
-// Pages
-import CommandCenter from './pages/CommandCenter';
-import OlapStudio from './pages/OlapStudio';
-import StreamMonitor from './pages/StreamMonitor';
-import RuleExplainer from './pages/RuleExplainer';
-import WarehouseAdmin from './pages/WarehouseAdmin';
-import IngestLab from './pages/IngestLab';
-import LoginPage from './pages/LoginPage';
-import ReportBuilder from './pages/ReportBuilder';
-import Glossary from './pages/Glossary';
-
-function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+const pages = [
+  ['/', 'Overview', CommandCenter], ['/reports', 'Reports', ReportBuilder], ['/olap', 'Explore data', OlapStudio],
+  ['/stream', 'Transaction monitor', StreamMonitor], ['/rules', 'Pattern analysis', RuleExplainer],
+  ['/warehouse', 'Warehouse health', WarehouseAdmin], ['/ingest', 'Import data', IngestLab], ['/glossary', 'Terms & help', Glossary],
+];
+export default function App() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { checking, isLoggedIn, canAccess } = useRole();
   const location = useLocation();
-  const { isLoggedIn } = useRole();
-  
-  // If not logged in, show the login page
-  if (!isLoggedIn && location.pathname !== '/login') {
-    return <LoginPage />;
-  }
-
-  // Mapping paths to titles for TopBar breadcrumb
-  const pageTitles = {
-    [ROUTES.COMMAND_CENTER]: 'Command Center',
-    [ROUTES.OLAP_STUDIO]: 'OLAP Studio',
-    [ROUTES.STREAM_MONITOR]: 'Stream Monitor',
-    [ROUTES.RULE_EXPLAINER]: 'Rule Explainer',
-    [ROUTES.WAREHOUSE_ADMIN]: 'Warehouse Admin',
-    [ROUTES.INGEST_LAB]: 'Ingest Lab',
-    [ROUTES.REPORT_BUILDER]: 'Report Builder',
-    [ROUTES.GLOSSARY]: 'Glossary & Help',
-  };
-  
-  const currentTitle = pageTitles[location.pathname] || 'SENTINEL';
-
-  return (
-    <div className="flex h-screen w-full overflow-hidden bg-paper font-sans">
-      <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <TopBar 
-          toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
-          title={currentTitle} 
-        />
-        <main className="flex-1 overflow-y-auto relative p-6 pb-24">
-          <Routes>
-            <Route path={ROUTES.COMMAND_CENTER} element={<CommandCenter />} />
-            <Route path={ROUTES.OLAP_STUDIO} element={<OlapStudio />} />
-            <Route path={ROUTES.STREAM_MONITOR} element={<StreamMonitor />} />
-            <Route path={ROUTES.RULE_EXPLAINER} element={<RuleExplainer />} />
-            <Route path={ROUTES.WAREHOUSE_ADMIN} element={<WarehouseAdmin />} />
-            <Route path={ROUTES.INGEST_LAB} element={<IngestLab />} />
-            <Route path={ROUTES.REPORT_BUILDER} element={<ReportBuilder />} />
-            <Route path={ROUTES.GLOSSARY} element={<Glossary />} />
-            <Route path={ROUTES.LOGIN} element={<Navigate to={ROUTES.COMMAND_CENTER} replace />} />
-          </Routes>
-        </main>
-      </div>
-    </div>
-  );
+  if (checking) return <div className="boot-screen">Opening Sentinel…</div>;
+  if (!isLoggedIn) return <Suspense fallback={<div className="boot-screen">Opening sign in…</div>}><LoginPage/></Suspense>;
+  const title = pages.find(([path])=>path===location.pathname)?.[1] || 'Overview';
+  return <div className="app-layout"><Sidebar open={menuOpen} onClose={()=>setMenuOpen(false)}/><div className="app-main"><TopBar title={title} toggleSidebar={()=>setMenuOpen(true)}/><main className="app-content"><Suspense fallback={<div className="chart-placeholder">Loading workspace…</div>}><Routes>{pages.map(([path,,Component])=><Route key={path} path={path} element={canAccess(path)?<Component/>:<Navigate to="/" replace/>}/>) }<Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></main></div></div>;
 }
-
-export default App;

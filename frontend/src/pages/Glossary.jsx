@@ -17,7 +17,7 @@ const GLOSSARY_TERMS = [
   { 
     term: 'Concept Drift', 
     category: 'Machine Learning', 
-    definition: "When fraudsters change their attack strategy, causing the AI model's accuracy to drop because it was trained on old patterns.", 
+    definition: "When the relationship between transaction signals and fraud labels changes over time. The model may need review or retraining.",
     technical: 'A change in the statistical properties of the target variable (P(y|x)) that the model tries to predict. Detected using ADWIN or EDDM algorithms.' 
   },
   { 
@@ -47,7 +47,7 @@ const GLOSSARY_TERMS = [
   { 
     term: 'ADWIN', 
     category: 'Streaming', 
-    definition: 'An automatic alarm that watches the model\'s error rate. If errors suddenly increase, it sounds the alarm: "The fraudsters changed their trick!"', 
+    definition: 'A method that watches recent prediction errors and flags a statistically meaningful change for investigation.',
     technical: 'ADaptive WINdowing: maintains a variable-length window of recent errors and detects distributional changes using the Hoeffding bound.' 
   },
   { 
@@ -59,7 +59,7 @@ const GLOSSARY_TERMS = [
   { 
     term: 'Step', 
     category: 'Streaming', 
-    definition: 'One hour of simulated bank time. The full dataset has 744 steps = 31 days (31 × 24 hours).', 
+    definition: 'One hour in the PaySim simulation. The included ingested sample covers only part of the full simulation.',
     technical: 'A discrete time unit in the PaySim simulation framework representing one hour of financial activity.' 
   },
   { 
@@ -71,7 +71,7 @@ const GLOSSARY_TERMS = [
   { 
     term: 'DuckDB', 
     category: 'Data Warehouse', 
-    definition: 'A super-fast database engine that runs inside your application. It answers analytical queries (sums, averages, groupings) in milliseconds.', 
+    definition: 'An embedded analytical database that groups and filters transaction facts for reports and exploration.',
     technical: 'An embedded columnar OLAP database with vectorized query execution, supporting full SQL with zero external dependencies.' 
   },
   { 
@@ -137,25 +137,25 @@ const GLOSSARY_TERMS = [
   { 
     term: 'Confidence', 
     category: 'Rule Mining', 
-    definition: 'How reliable a pattern is. If confidence is 94%, then 94 out of 100 times this combination appears, it turns out to be fraud.', 
+    definition: 'Among rows that contain the left-hand pattern, the share that also contain the right-hand outcome. It is an association in this sample.',
     technical: 'The conditional probability P(Y|X) = support(X∪Y) / support(X). Measures rule reliability.' 
   },
   { 
     term: 'Lift', 
     category: 'Rule Mining', 
-    definition: 'How much more suspicious this pattern is compared to random chance. A lift of 11x means this pattern is 11 times more dangerous than normal.', 
+    definition: 'How much more often the outcome appears with this pattern than in the sample overall. Lift does not establish cause.',
     technical: 'lift(X→Y) = confidence(X→Y) / support(Y). Values > 1 indicate positive correlation.' 
   },
   { 
     term: 'Emerged Rule', 
     category: 'Rule Mining', 
-    definition: 'A brand new fraud pattern that appeared AFTER the drift — the new trick that thieves started using.', 
+    definition: 'An association that met the selected thresholds after a drift event but not before it.',
     technical: 'An association rule present in the post-drift window but absent from the pre-drift window, indicating a novel behavioral pattern.' 
   },
   { 
     term: 'Extinct Rule', 
     category: 'Rule Mining', 
-    definition: 'An old fraud pattern that disappeared AFTER the drift — the old trick that thieves abandoned because it was getting caught.', 
+    definition: 'An association that met the selected thresholds before a drift event but not after it.',
     technical: 'An association rule present in the pre-drift window but absent from the post-drift window, indicating an abandoned attack vector.' 
   },
 ];
