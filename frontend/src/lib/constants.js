@@ -1,7 +1,7 @@
 const getWsUrl = () => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname || '127.0.0.1';
-    const port = '8000';
+    const port = import.meta.env.VITE_API_PORT || '8000';
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${host}:${port}/ws/stream`;
   }
