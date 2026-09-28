@@ -23,6 +23,7 @@ venv/
 # Database transient files
 *.duckdb.wal
 *.duckdb.tmp
+backend/data/sentinel_runtime.duckdb
 
 # IDE / Editor
 .vscode/

@@ -3,7 +3,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-WAREHOUSE_PATH = DATA_DIR / "sentinel_warehouse.duckdb"
+WAREHOUSE_SEED_PATH = DATA_DIR / "sentinel_warehouse.duckdb"
+WAREHOUSE_PATH = Path(os.getenv("SENTINEL_WAREHOUSE_PATH", str(DATA_DIR / "sentinel_runtime.duckdb")))
 PAYSIM_CSV_PATH = DATA_DIR / "paysim.csv"
 
 # Stream defaults
