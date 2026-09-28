@@ -123,29 +123,20 @@ class StreamClassifier:
             else:
                 error = None
             
-            raw_acc = self.rolling_accuracy.get() if self.total_samples > 10 else 0.982
-            # Bounding between realistic ranges: 82% (post-drift dip) to 98.6% (normal operations)
-            display_acc = min(0.986, max(0.820, raw_acc))
-            raw_f1 = self.rolling_f1.get() if self.total_samples > 10 else 0.892
+            raw_acc = self.rolling_accuracy.get() if self.total_samples > 10 else None
+            raw_f1 = self.rolling_f1.get() if self.total_samples > 10 else None
             
             return {
                 'prediction': int(pred),
                 'fraud_probability': round(float(calibrated_prob), 4),
                 'error': error,
-                'accuracy': round(float(display_acc), 4),
-                'f1': round(float(raw_f1), 4),
+                'accuracy': round(float(raw_acc), 4) if raw_acc is not None else None,
+                'f1': round(float(raw_f1), 4) if raw_f1 is not None else None,
                 'total_samples': self.total_samples
             }
         except Exception as e:
             logger.error(f"Error in predict_and_learn: {e}")
-            return {
-                'prediction': 0,
-                'fraud_probability': 0.0,
-                'error': None,
-                'accuracy': 0.982,
-                'f1': 0.892,
-                'total_samples': self.total_samples
-            }
+            raise RuntimeError("Transaction scoring failed") from e
     
     def _extract_features(self, raw: dict) -> dict:
         try:
@@ -166,16 +157,7 @@ class StreamClassifier:
             }
         except (ValueError, TypeError) as e:
             logger.error(f"Error extracting features: {e}")
-            return {
-                'type_encoded': 0,
-                'amount': 0.0,
-                'oldbalanceOrg': 0.0,
-                'newbalanceOrig': 0.0,
-                'oldbalanceDest': 0.0,
-                'newbalanceDest': 0.0,
-                'balance_delta_orig': 0.0,
-                'balance_delta_dest': 0.0,
-            }
+            raise ValueError("Invalid transaction features") from e
     
     def reset(self):
         self.__init__()
