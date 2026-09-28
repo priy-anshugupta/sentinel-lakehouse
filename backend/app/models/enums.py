@@ -18,6 +18,7 @@ class Granularity(str, Enum):
     HOUR = "HOUR"
     DAY = "DAY"
     WEEK = "WEEK"
+    MONTH = "MONTH"
 
 class StreamState(str, Enum):
     IDLE = "IDLE"
