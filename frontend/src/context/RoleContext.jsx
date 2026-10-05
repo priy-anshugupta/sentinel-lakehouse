@@ -2,9 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import api, { setAccessToken } from '../lib/api';
 
 const ROLE_CONFIG = {
-  BRANCH_MANAGER: { title: 'Branch manager', allowedRoutes: ['/', '/reports', '/olap', '/glossary'] },
-  FRAUD_INVESTIGATOR: { title: 'Fraud investigator', allowedRoutes: ['/', '/reports', '/olap', '/stream', '/rules', '/glossary'] },
-  DATA_ENGINEER: { title: 'Data engineer', allowedRoutes: ['/', '/reports', '/olap', '/stream', '/rules', '/warehouse', '/ingest', '/glossary'] },
+  BRANCH_MANAGER: { title: 'Branch manager', workspace: 'Management workspace', description: 'Review exposure, understand trends and prepare reports.', allowedRoutes: ['/', '/reports', '/olap', '/rules', '/glossary'] },
+  FRAUD_INVESTIGATOR: { title: 'Fraud investigator', workspace: 'Investigation workspace', description: 'Review flagged transactions and investigate changing patterns.', allowedRoutes: ['/', '/reports', '/olap', '/stream', '/rules', '/glossary'] },
+  DATA_ENGINEER: { title: 'Data engineer', workspace: 'Data operations workspace', description: 'Maintain the data, check quality and train mining models.', allowedRoutes: ['/', '/reports', '/olap', '/stream', '/rules', '/models', '/dataset', '/warehouse', '/ingest', '/glossary'] },
 };
 const RoleContext = createContext(null);
 
