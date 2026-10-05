@@ -48,18 +48,18 @@ def discretize_transaction(row: dict) -> dict:
     """Discretizes a transaction dict into categorical items matching PRD."""
     try:
         amount = float(row.get('amount', 0))
-        hour = int(row.get('step', 0)) % 24
+        hour = (int(row.get('step', 1)) - 1) % 24
         
         if 'oldbalanceOrg' in row and 'newbalanceOrig' in row:
             old_bal = float(row.get('oldbalanceOrg', 0))
             new_bal = float(row.get('newbalanceOrig', 0))
         else:
-            old_bal = 0.0
-            new_bal = 0.0
+            delta = float(row.get('orig_balance_delta', 0))
+            old_bal = new_bal = None
 
         amount_bin = get_amount_bin(amount)
         time_period = get_time_bin(hour)
-        drain_type = get_drain_type(old_bal, new_bal)
+        drain_type = get_drain_type(old_bal, new_bal) if old_bal is not None else ('DECREASE' if delta < 0 else 'INCREASE' if delta > 0 else 'UNCHANGED')
         
         return {
             'type': str(row.get('type', 'UNKNOWN')).upper(),
@@ -73,7 +73,7 @@ def discretize_transaction(row: dict) -> dict:
 
 
 def discretize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Discretizes a DataFrame and returns one-hot encoded format suitable for FP-Growth."""
+    """Discretizes warehouse attributes without inventing missing balances or labels."""
     try:
         if df.empty:
             return pd.DataFrame()
@@ -81,8 +81,9 @@ def discretize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         discretized_rows = []
         for _, row in df.iterrows():
             d_row = discretize_transaction(row.to_dict())
-            if 'isFraud' in row:
-                d_row['isFraud'] = 'FRAUD' if int(row['isFraud']) == 1 else 'LEGIT'
+            label = row.get('isFraud', row.get('is_fraud_actual'))
+            if pd.notna(label):
+                d_row['isFraud'] = 'FRAUD' if int(label) == 1 else 'LEGIT'
             discretized_rows.append(d_row)
             
         df_disc = pd.DataFrame(discretized_rows)
@@ -92,7 +93,7 @@ def discretize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         # One-hot encode the categorical variables
         df_encoded = pd.get_dummies(df_disc, prefix_sep='=')
         
-        # FP-Growth in mlxtend requires boolean values
+        # Apriori in mlxtend requires boolean values.
         df_encoded = df_encoded.astype(bool)
         
         return df_encoded

@@ -1,5 +1,5 @@
 import pandas as pd
-from mlxtend.frequent_patterns import fpgrowth, association_rules
+from mlxtend.frequent_patterns import apriori, association_rules
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,7 +10,7 @@ def mine_window_rules(encoded_df: pd.DataFrame, min_support: float = 0.05, min_c
         if encoded_df.empty:
             return pd.DataFrame()
             
-        frequent_itemsets = fpgrowth(encoded_df, min_support=min_support, use_colnames=True)
+        frequent_itemsets = apriori(encoded_df, min_support=min_support, use_colnames=True, max_len=3)
         
         if frequent_itemsets.empty:
             return pd.DataFrame()
@@ -92,7 +92,7 @@ def compute_rule_diff(pre_rules: pd.DataFrame, post_rules: pd.DataFrame, min_lif
             for _, row in rules_df.iterrows():
                 consequents = list(row['consequents'])
                 # Consider rules where consequent implies Fraud if available, or just general rules
-                if any('FRAUD' in str(c).upper() for c in consequents):
+                if 'isFraud=FRAUD' in consequents:
                     rid = get_rule_id(row)
                     rule_dict[rid] = format_rule(row)
             return rule_dict
