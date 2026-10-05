@@ -35,9 +35,9 @@ async def get_drift_events(request: Request):
         con = get_connection()
         res = con.execute("""
             SELECT drift_id, detected_at_step, detected_at_ts, 
-                   error_rate_before, error_rate_after, is_injected, rules_json
+                   error_rate_before, error_rate_after, is_injected, rules_json, model_version
             FROM fact_drift_events
-            ORDER BY detected_at_ts DESC
+            ORDER BY drift_id DESC
         """).fetchdf()
         
         events = []
@@ -56,7 +56,8 @@ async def get_drift_events(request: Request):
                     "error_rate_before": float(row["error_rate_before"] or 0.0),
                     "error_rate_after": float(row["error_rate_after"] or 0.0),
                     "is_injected": bool(row["is_injected"]),
-                    "rules_summary": rules_summary
+                    "rules_summary": rules_summary,
+                    "model_version": row['model_version']
                 })
         
         return events
@@ -67,11 +68,10 @@ async def get_drift_events(request: Request):
 async def mine_rules(params: MiningParams):
     con = get_connection()
     try:
-        step = 350
-        if params.drift_id > 0:
-            res = con.execute("SELECT detected_at_step FROM fact_drift_events WHERE drift_id = ?", (params.drift_id,)).fetchone()
-            if res:
-                step = res[0]
+        res = con.execute("SELECT detected_at_step FROM fact_drift_events WHERE drift_id = ?", (params.drift_id,)).fetchone()
+        if not res:
+            raise HTTPException(404, 'Choose a recorded drift event before comparing rules')
+        step = res[0]
                 
         result = mine_drift_rules(
             con,
@@ -82,5 +82,7 @@ async def mine_rules(params: MiningParams):
             min_lift=params.min_lift
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
