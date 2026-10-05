@@ -1,162 +1,166 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  BookOpen, 
-  Search, 
-  ChevronDown, 
-  ChevronUp, 
-  X, 
-  Code2, 
-  Sparkles, 
-  Filter, 
+import {
+  BookOpen,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Code2,
+  Sparkles,
+  Filter,
   Info,
   Maximize2,
   Minimize2
 } from 'lucide-react';
 
 const GLOSSARY_TERMS = [
-  { 
-    term: 'Concept Drift', 
-    category: 'Machine Learning', 
+  {term:'K-means',category:'Machine Learning',definition:'Groups transactions with similar transformed amounts, balance changes and types. The groups are behaviour descriptions, not fraud verdicts.',technical:'K-means minimises within-cluster squared distances. Sentinel log-transforms numeric features, standardises features, and fixes random_state=42.'},
+  {term:'PCA',category:'Machine Learning',definition:'Compresses several transaction features into two coordinates so clusters can be drawn. These coordinates are not currency or risk scores.',technical:'Principal component analysis. The displayed variance retained tells how much variation the two plotted components preserve.'},
+  {term:'Silhouette Score',category:'Machine Learning',definition:'Measures whether transactions are closer to their own group than other groups. A higher value indicates clearer separation.',technical:'Ranges from -1 to 1. Sentinel reports a deterministic sample score on at most 2,000 rows.'},
+
+  {
+    term: 'Concept Drift',
+    category: 'Machine Learning',
     definition: "When the relationship between transaction signals and fraud labels changes over time. The model may need review or retraining.",
-    technical: 'A change in the statistical properties of the target variable (P(y|x)) that the model tries to predict. Detected using ADWIN or EDDM algorithms.' 
+    technical: 'A change in the statistical properties of the target variable (P(y|x)) that the model tries to predict. Detected using ADWIN or EDDM algorithms.'
   },
-  { 
-    term: 'Hoeffding Tree', 
-    category: 'Machine Learning', 
-    definition: 'An AI decision tree that learns from each transaction one-by-one in real time, without needing to store all past data in memory.', 
-    technical: 'An incremental decision tree classifier that uses the Hoeffding bound to determine the minimum number of samples needed to split a node with statistical confidence.' 
+  {
+    term: 'Decision Tree (CART)',
+    category: 'Machine Learning',
+    definition: 'A model that learns if–then branches from earlier labelled transactions. Sentinel trains it in batches and displays its branches in Model lab.',
+    technical: 'A scikit-learn DecisionTreeClassifier using Gini or entropy splits, balanced class weights, maximum depth and minimum leaf size. Later simulation steps are reserved for testing.'
   },
-  { 
-    term: 'Rolling Accuracy', 
-    category: 'Machine Learning', 
-    definition: "The model's accuracy measured over the most recent 500 transactions (not all-time), so it reflects current performance.", 
-    technical: 'A sliding window metric (window=500) that computes accuracy only on the most recent N predictions, discarding older ones.' 
+  {
+    term: 'Rolling Accuracy',
+    category: 'Machine Learning',
+    definition: "The model's accuracy measured over the most recent 500 transactions (not all-time), so it reflects current performance.",
+    technical: 'A sliding window metric (window=500) that computes accuracy only on the most recent N predictions, discarding older ones.'
   },
-  { 
-    term: 'F1-Score', 
-    category: 'Machine Learning', 
-    definition: 'A combined score measuring how well the AI catches fraud without raising too many false alarms. Higher is better.', 
-    technical: 'The harmonic mean of Precision and Recall: F1 = 2 × (P × R) / (P + R). Balances false positives and false negatives.' 
+  {
+    term: 'F1-Score',
+    category: 'Machine Learning',
+    definition: 'A combined score measuring how well the AI catches fraud without raising too many false alarms. Higher is better.',
+    technical: 'The harmonic mean of Precision and Recall: F1 = 2 × (P × R) / (P + R). Balances false positives and false negatives.'
   },
-  { 
-    term: 'Prequential Evaluation', 
-    category: 'Machine Learning', 
-    definition: 'The model predicts first, then checks if it was right, then learns. This ensures we measure real performance, not memorization.', 
-    technical: 'Also called Test-Then-Train: each sample is first used for testing (prediction), then for training (model update).' 
+  {
+    term: 'Chronological Holdout',
+    category: 'Machine Learning',
+    definition: 'Train on earlier simulation steps, then evaluate on later steps the tree did not train on. All rows from one step remain on the same side of the split.',
+    technical: 'Temporal holdout with training step < cutoff and test step >= cutoff. Hyperparameters are user-selected; repeated use of the same test window is exploratory, not a final independent validation.'
   },
-  { 
-    term: 'ADWIN', 
-    category: 'Streaming', 
+  {
+    term: 'ADWIN',
+    category: 'Streaming',
     definition: 'A method that watches recent prediction errors and flags a statistically meaningful change for investigation.',
-    technical: 'ADaptive WINdowing: maintains a variable-length window of recent errors and detects distributional changes using the Hoeffding bound.' 
+    technical: 'ADaptive WINdowing: maintains a variable-length window of recent errors and detects distributional changes using the Hoeffding bound.'
   },
-  { 
-    term: 'WebSocket', 
-    category: 'Streaming', 
-    definition: 'A live, always-on connection between the server and your browser. Transactions flow through it in real time without page refreshes.', 
-    technical: 'A full-duplex communication protocol over a single TCP connection, enabling real-time bidirectional data transfer.' 
+  {
+    term: 'WebSocket',
+    category: 'Streaming',
+    definition: 'A live, always-on connection between the server and your browser. Transactions flow through it in real time without page refreshes.',
+    technical: 'A full-duplex communication protocol over a single TCP connection, enabling real-time bidirectional data transfer.'
   },
-  { 
-    term: 'Step', 
-    category: 'Streaming', 
+  {
+    term: 'Step',
+    category: 'Streaming',
     definition: 'One hour in the PaySim simulation. The included ingested sample covers only part of the full simulation.',
-    technical: 'A discrete time unit in the PaySim simulation framework representing one hour of financial activity.' 
+    technical: 'A discrete time unit in the PaySim simulation framework representing one hour of financial activity.'
   },
-  { 
-    term: 'Star Schema', 
-    category: 'Data Warehouse', 
-    definition: 'A database design where one central Facts table (all transactions) is connected to smaller Dimension tables (accounts, dates, types).', 
-    technical: 'A Kimball-style dimensional model with a denormalized fact table at the center and conformed dimension tables connected via surrogate integer keys.' 
+  {
+    term: 'Star Schema',
+    category: 'Data Warehouse',
+    definition: 'A database design where one central Facts table (all transactions) is connected to smaller Dimension tables (accounts, dates, types).',
+    technical: 'A Kimball-style dimensional model with a denormalized fact table at the center and conformed dimension tables connected via surrogate integer keys.'
   },
-  { 
-    term: 'DuckDB', 
-    category: 'Data Warehouse', 
+  {
+    term: 'DuckDB',
+    category: 'Data Warehouse',
     definition: 'An embedded analytical database that groups and filters transaction facts for reports and exploration.',
-    technical: 'An embedded columnar OLAP database with vectorized query execution, supporting full SQL with zero external dependencies.' 
+    technical: 'An embedded columnar OLAP database with vectorized query execution, supporting full SQL with zero external dependencies.'
   },
-  { 
-    term: 'Fact Table', 
-    category: 'Data Warehouse', 
-    definition: 'The main table storing every single transaction with its amount, fraud flag, and timestamps. This is where all the numbers live.', 
-    technical: 'fact_transactions: the central grain-level table containing quantitative measures (amount, is_fraud, balance_delta) and foreign keys to dimension tables.' 
+  {
+    term: 'Fact Table',
+    category: 'Data Warehouse',
+    definition: 'The main table storing every single transaction with its amount, fraud flag, and timestamps. This is where all the numbers live.',
+    technical: 'fact_transactions: the central grain-level table containing quantitative measures (amount, is_fraud, balance_delta) and foreign keys to dimension tables.'
   },
-  { 
-    term: 'Dimension Table', 
-    category: 'Data Warehouse', 
-    definition: 'Smaller tables that describe context: Who sent the money? What type of transaction? What time of day? These add meaning to the numbers.', 
-    technical: 'Conformed dimensions (dim_account, dim_time, dim_transaction_type) providing descriptive attributes for slicing and filtering.' 
+  {
+    term: 'Dimension Table',
+    category: 'Data Warehouse',
+    definition: 'Smaller tables that describe context: Who sent the money? What type of transaction? What time of day? These add meaning to the numbers.',
+    technical: 'Conformed dimensions (dim_account, dim_time, dim_transaction_type) providing descriptive attributes for slicing and filtering.'
   },
-  { 
-    term: 'ETL', 
-    category: 'Data Warehouse', 
-    definition: 'Extract, Transform, Load — the process of taking raw transaction data, cleaning it up, and storing it neatly in the database.', 
-    technical: 'A data pipeline that extracts raw PaySim records, transforms them (type encoding, balance calculations), and loads into the DuckDB star schema.' 
+  {
+    term: 'ETL',
+    category: 'Data Warehouse',
+    definition: 'Extract, Transform, Load — the process of taking raw transaction data, cleaning it up, and storing it neatly in the database.',
+    technical: 'A data pipeline that extracts raw PaySim records, transforms them (type encoding, balance calculations), and loads into the DuckDB star schema.'
   },
-  { 
-    term: 'Roll-Up', 
-    category: 'OLAP Operations', 
-    definition: 'Combining small time periods into bigger summaries. Like going from daily reports → weekly reports → monthly reports.', 
-    technical: 'An OLAP aggregation operation that climbs up a dimension hierarchy, applying aggregate functions (SUM, COUNT, AVG) at each level.' 
+  {
+    term: 'Roll-Up',
+    category: 'OLAP Operations',
+    definition: 'Summarising detailed transactions by a broader time level, such as day to week or day to a 30-day simulation month.',
+    technical: 'An OLAP aggregation operation that climbs up a dimension hierarchy, applying aggregate functions (SUM, COUNT, AVG) at each level.'
   },
-  { 
-    term: 'Drill-Down', 
-    category: 'OLAP Operations', 
-    definition: 'The opposite of Roll-Up. Breaking a monthly summary back into weeks, then into individual days for detailed inspection.', 
-    technical: 'Navigating down the dimension hierarchy from coarse to fine granularity, decomposing aggregates into constituent detail records.' 
+  {
+    term: 'Drill-Down',
+    category: 'OLAP Operations',
+    definition: 'The opposite of Roll-Up. Breaking a month or week into its days, then a day into hours for detailed inspection.',
+    technical: 'Navigating down the dimension hierarchy from coarse to fine granularity, decomposing aggregates into constituent detail records.'
   },
-  { 
-    term: 'Slice', 
-    category: 'OLAP Operations', 
-    definition: 'Filtering the data to show only one specific category. Like saying: "Show me ONLY transfer transactions" or "Show me ONLY nighttime activity."', 
-    technical: 'Selecting a single value along one dimension of the OLAP cube, producing a (N-1)-dimensional sub-cube.' 
+  {
+    term: 'Slice',
+    category: 'OLAP Operations',
+    definition: 'Filtering the data to show only one specific category. Like saying: "Show me ONLY transfer transactions" or "Show me ONLY nighttime activity."',
+    technical: 'Selecting a single value along one dimension of the OLAP cube, producing a (N-1)-dimensional sub-cube.'
   },
-  { 
-    term: 'Dice', 
-    category: 'OLAP Operations', 
-    definition: 'Filtering on multiple categories at once. Like saying: "Show me transfers AND cash-outs, but only during weeks 2 to 4."', 
-    technical: 'Selecting specific values along two or more dimensions simultaneously, producing a smaller sub-cube bounded by the selection criteria.' 
+  {
+    term: 'Dice',
+    category: 'OLAP Operations',
+    definition: 'Filtering on multiple categories at once. Like saying: "Show me transfers AND cash-outs, but only during weeks 2 to 4."',
+    technical: 'Selecting specific values along two or more dimensions simultaneously, producing a smaller sub-cube bounded by the selection criteria.'
   },
-  { 
-    term: 'Pivot', 
-    category: 'OLAP Operations', 
-    definition: 'Rotating the view. Swapping rows and columns to see the same data from a different angle.', 
-    technical: 'A rotation of the data cube axes, transposing row and column dimensions to provide an alternative analytical perspective.' 
+  {
+    term: 'Pivot',
+    category: 'OLAP Operations',
+    definition: 'Rotating the view. Swapping rows and columns to see the same data from a different angle.',
+    technical: 'A rotation of the data cube axes, transposing row and column dimensions to provide an alternative analytical perspective.'
   },
-  { 
-    term: 'FP-Growth', 
-    category: 'Rule Mining', 
-    definition: 'An algorithm that automatically finds patterns like: "IF Transfer + Evening + Partial Drain → Usually Fraud."', 
-    technical: 'Frequent Pattern Growth: a tree-based algorithm for mining frequent itemsets without candidate generation, more efficient than Apriori.' 
+  {
+    term: 'Apriori',
+    category: 'Rule Mining',
+    definition: 'An algorithm that finds attributes occurring together often enough in warehouse records. Rules show support, confidence and lift.',
+    technical: 'Frequent-itemset candidate generation followed by association-rule extraction. Sentinel uses itemsets of up to three discretised attributes.'
   },
-  { 
-    term: 'Support', 
-    category: 'Rule Mining', 
-    definition: 'How common a pattern is. If support is 4.2%, this pattern appears in 4.2 out of every 100 transactions.', 
-    technical: 'The proportion of transactions in the dataset that contain the itemset: support(X) = count(X) / |D|.' 
+  {
+    term: 'Support',
+    category: 'Rule Mining',
+    definition: 'How common a pattern is. If support is 4.2%, this pattern appears in 4.2 out of every 100 transactions.',
+    technical: 'The proportion of transactions in the dataset that contain the itemset: support(X) = count(X) / |D|.'
   },
-  { 
-    term: 'Confidence', 
-    category: 'Rule Mining', 
+  {
+    term: 'Confidence',
+    category: 'Rule Mining',
     definition: 'Among rows that contain the left-hand pattern, the share that also contain the right-hand outcome. It is an association in this sample.',
-    technical: 'The conditional probability P(Y|X) = support(X∪Y) / support(X). Measures rule reliability.' 
+    technical: 'The conditional probability P(Y|X) = support(X∪Y) / support(X). Measures rule reliability.'
   },
-  { 
-    term: 'Lift', 
-    category: 'Rule Mining', 
+  {
+    term: 'Lift',
+    category: 'Rule Mining',
     definition: 'How much more often the outcome appears with this pattern than in the sample overall. Lift does not establish cause.',
-    technical: 'lift(X→Y) = confidence(X→Y) / support(Y). Values > 1 indicate positive correlation.' 
+    technical: 'lift(X→Y) = confidence(X→Y) / support(Y). Values > 1 indicate positive correlation.'
   },
-  { 
-    term: 'Emerged Rule', 
-    category: 'Rule Mining', 
+  {
+    term: 'Emerged Rule',
+    category: 'Rule Mining',
     definition: 'An association that met the selected thresholds after a drift event but not before it.',
-    technical: 'An association rule present in the post-drift window but absent from the pre-drift window, indicating a novel behavioral pattern.' 
+    technical: 'An association rule present in the post-drift window but absent from the pre-drift window, indicating a novel behavioral pattern.'
   },
-  { 
-    term: 'Extinct Rule', 
-    category: 'Rule Mining', 
+  {
+    term: 'Extinct Rule',
+    category: 'Rule Mining',
     definition: 'An association that met the selected thresholds before a drift event but not after it.',
-    technical: 'An association rule present in the pre-drift window but absent from the post-drift window, indicating an abandoned attack vector.' 
+    technical: 'An association rule present in the pre-drift window but absent from the post-drift window, indicating an association that no longer meets thresholds.'
   },
 ];
 
@@ -507,7 +511,7 @@ export default function Glossary() {
           </span>
         </div>
         <div className="shrink-0 font-mono text-[11px] text-fog">
-          Sentinel Enterprise v1.2
+          Sentinel · DWM demonstration
         </div>
       </div>
     </div>

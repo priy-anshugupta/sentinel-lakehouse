@@ -5,7 +5,7 @@ import { formatNumber } from '../lib/formatters';
 
 const description = {
   fact_transactions:'One row per ingested transaction, with amounts, fraud labels, model flags and dimension keys.',
-  fact_drift_events:'Recorded shifts in online model error and their analysis windows.',
+  fact_drift_events:'Recorded shifts in model prediction error and their analysis windows.',
   dim_time:'Simulation time attributes for weekly, daily and hourly aggregation.',
   dim_transaction_type:'The five transaction categories used to slice risk.',
   dim_account:'Origin and destination account attributes used for analysis.',
