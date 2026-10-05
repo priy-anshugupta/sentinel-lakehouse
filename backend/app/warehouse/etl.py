@@ -1,41 +1,46 @@
 import duckdb
+import pandas as pd
 from typing import List, Dict, Any
 
-def populate_dim_time(con: duckdb.DuckDBPyConnection):
-    count = con.execute("SELECT COUNT(*) FROM dim_time").fetchone()[0]
-    if count >= 744:
-        return
+def populate_dim_time(con: duckdb.DuckDBPyConnection, max_step: int = 744):
     
     days_of_week = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     data = []
-    for step in range(744):
-        hour_of_day = step % 24
+    existing = {r[0] for r in con.execute('SELECT time_key FROM dim_time').fetchall()}
+    for step in range(1, max_step + 1):
+        if step in existing:
+            continue
+        hour_of_day = (step - 1) % 24
         period_of_day = 'Morning' if 6 <= hour_of_day < 12 else \
                         'Afternoon' if 12 <= hour_of_day < 18 else \
                         'Evening' if 18 <= hour_of_day < 24 else 'Night'
-        day_number = step // 24
-        day_of_week = days_of_week[day_number % 7]
-        week_number = day_number // 7
+        day_number = (step - 1) // 24 + 1
+        day_of_week = days_of_week[(day_number - 1) % 7]
+        week_number = (step - 1) // 168 + 1
         is_night = hour_of_day < 6 or hour_of_day >= 22
         is_weekend = day_of_week in ['Sat', 'Sun']
         
         data.append((step, step, hour_of_day, period_of_day, day_number, day_of_week, week_number, is_night, is_weekend))
         
-    con.executemany("""
+    if data:
+        con.executemany("""
         INSERT INTO dim_time (time_key, step, hour_of_day, period_of_day, day_number, day_of_week, week_number, is_night, is_weekend)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, data)
-
-_account_cache = {}
-_type_cache = {}
+        """, data)
+    # Normalise legacy derived attributes, preserving referenced time keys.
+    con.execute('''UPDATE dim_time SET
+        hour_of_day = (step - 1) % 24,
+        day_number = CAST(FLOOR((step - 1) / 24) AS INTEGER) + 1,
+        week_number = CAST(FLOOR((step - 1) / 168) AS INTEGER) + 1,
+        day_of_week = list_extract(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], CAST(FLOOR((step - 1) / 24) AS INTEGER) % 7 + 1),
+        period_of_day = CASE WHEN (step-1)%24 < 6 THEN 'Night' WHEN (step-1)%24 < 12 THEN 'Morning' WHEN (step-1)%24 < 18 THEN 'Afternoon' ELSE 'Evening' END,
+        is_night = ((step-1)%24 < 6 OR (step-1)%24 >= 22),
+        is_weekend = (CAST(FLOOR((step-1)/24) AS INTEGER)%7 >= 5)
+        WHERE step >= 1''')
 
 def get_or_create_account(con: duckdb.DuckDBPyConnection, account_id: str, current_step: int = 0) -> int:
-    if account_id in _account_cache:
-        return _account_cache[account_id]
-
     result = con.execute("SELECT acc_key FROM dim_account WHERE account_id = ?", (account_id,)).fetchone()
     if result:
-        _account_cache[account_id] = result[0]
         return result[0]
     
     acc_key_res = con.execute("SELECT COALESCE(MAX(acc_key), 0) + 1 FROM dim_account").fetchone()
@@ -48,18 +53,22 @@ def get_or_create_account(con: duckdb.DuckDBPyConnection, account_id: str, curre
         INSERT INTO dim_account (acc_key, account_id, account_type, name_prefix, first_seen_step, risk_tier)
         VALUES (?, ?, ?, ?, ?, ?)
     """, (acc_key, account_id, account_type, prefix, current_step, 'LOW'))
-    _account_cache[account_id] = acc_key
     return acc_key
 
 def get_type_key(con: duckdb.DuckDBPyConnection, type_name: str) -> int:
-    if type_name in _type_cache:
-        return _type_cache[type_name]
     result = con.execute("SELECT type_key FROM dim_transaction_type WHERE type_name = ?", (type_name,)).fetchone()
-    key = result[0] if result else 1 
-    _type_cache[type_name] = key
+    if not result:
+        raise ValueError(f'Unsupported transaction type: {type_name}')
+    key = result[0]
     return key
 
 def transform_and_load_batch(con: duckdb.DuckDBPyConnection, batch: List[Dict[str, Any]], predictions: List[Dict[str, Any]]):
+    if len(batch) != len(predictions):
+        raise ValueError('Each transaction needs one scoring result')
+    if batch:
+        largest = max(int(row['step']) for row in batch)
+        if con.execute('SELECT count(*) FROM dim_time WHERE time_key=?', [largest]).fetchone()[0] == 0:
+            populate_dim_time(con, largest)
     insert_data = []
     
     for row, pred in zip(batch, predictions):
@@ -76,15 +85,16 @@ def transform_and_load_batch(con: duckdb.DuckDBPyConnection, batch: List[Dict[st
         orig_balance_delta = float(row.get('newbalanceOrig', 0)) - float(row.get('oldbalanceOrg', 0))
         dest_balance_delta = float(row.get('newbalanceDest', 0)) - float(row.get('oldbalanceDest', 0))
         
-        is_fraud_actual = int(row.get('isFraud', 0))
-        is_fraud_pred = int(pred.get('verdict', 0))
-        fraud_prob = float(pred.get('fraud_probability', 0.0))
-        pred_error = abs(is_fraud_actual - fraud_prob)
+        known_label = row.get('isFraud')
+        is_fraud_actual = None if pd.isna(known_label) else int(known_label)
+        is_fraud_pred = int(pred['verdict']) if pred.get('verdict') is not None else None
+        fraud_prob = float(pred['fraud_probability']) if pred.get('fraud_probability') is not None else None
+        pred_error = abs(is_fraud_actual - fraud_prob) if is_fraud_actual is not None and fraud_prob is not None else None
         
         insert_data.append((
             time_key, type_key, orig_acc_key, dest_acc_key, amount, 
             orig_balance_delta, dest_balance_delta, is_fraud_actual, 
-            is_fraud_pred, fraud_prob, pred_error, step
+            is_fraud_pred, fraud_prob, pred_error, step, pred.get('model_version')
         ))
         
     if insert_data:
@@ -92,6 +102,6 @@ def transform_and_load_batch(con: duckdb.DuckDBPyConnection, batch: List[Dict[st
             INSERT INTO fact_transactions (
                 time_key, type_key, orig_acc_key, dest_acc_key, amount, 
                 orig_balance_delta, dest_balance_delta, is_fraud_actual, 
-                is_fraud_pred, fraud_probability, prediction_error, step_number
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                is_fraud_pred, fraud_probability, prediction_error, step_number, model_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, insert_data)

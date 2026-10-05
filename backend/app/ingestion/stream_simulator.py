@@ -29,7 +29,6 @@ class StreamSimulator:
 
     def arm_drift(self):
         self._drift_armed = True
-        self._is_injected = True
 
     def reset(self):
         self._current_step = 1
@@ -41,7 +40,7 @@ class StreamSimulator:
 
     def inject_drift(self, row: dict, current_step: int) -> dict:
         # Trigger if past drift step OR if user explicitly armed drift
-        if (current_step >= self.drift_injection_step or self._drift_armed) and row.get('isFraud') == 1:
+        if self._drift_armed and row.get('isFraud') == 1:
             row['type'] = 'TRANSFER'
             original_amount = float(row.get('amount', 0.0))
             row['amount'] = round(original_amount * 0.4, 2)
