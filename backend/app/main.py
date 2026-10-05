@@ -8,6 +8,8 @@ from app.warehouse.connection import init_warehouse, close_connection
 from app.warehouse.etl import populate_dim_time
 from app.intelligence.stream_classifier import StreamClassifier
 from app.intelligence.drift_detector import DriftDetector
+from app.intelligence.model_lab import restore_or_train
+from app.routes.learning import router as learning_router
 from app.ingestion.stream_simulator import StreamSimulator
 
 # Import routers
@@ -18,6 +20,7 @@ from app.routes.ingest import router as ingest_router
 from app.routes.warehouse_admin import router as admin_router
 from app.routes.stream_ws import router as ws_router
 from app.routes.stream_control import router as stream_control_router
+from app.routes.alerts import router as alerts_router
 from app.auth import router as auth_router, request_user
 from fastapi.responses import JSONResponse
 
@@ -26,9 +29,11 @@ async def lifespan(app: FastAPI):
     # Initialize warehouse
     con = init_warehouse()
     populate_dim_time(con)
+    con.execute('CHECKPOINT')
     
     # Initialize global ML states
     app.state.classifier = StreamClassifier()
+    restore_or_train(con, app.state.classifier)
     app.state.drift_detector = DriftDetector()
     
     # Initialize Simulator
@@ -40,6 +45,9 @@ async def lifespan(app: FastAPI):
             f.write("step,type,amount,nameOrig,oldbalanceOrg,newbalanceOrig,nameDest,oldbalanceDest,newbalanceDest,isFraud,isFlaggedFraud\n")
             
     app.state.simulator = StreamSimulator(csv_path)
+    app.state.stream_task = None
+    app.state.stream_speed = {'val': 200}
+    app.state.stream_state = 'IDLE'
     app.state.start_time = time.time()
     
     yield
@@ -65,10 +73,10 @@ async def protect_api(request, call_next):
     if not user:
         return JSONResponse({"detail": "Sign in required"}, status_code=401)
     role = user["role"]
-    if path.startswith(("/api/warehouse", "/api/ingest")) and role != "DATA_ENGINEER":
+    if path.startswith(("/api/warehouse", "/api/ingest", "/api/learning")) and role != "DATA_ENGINEER":
         return JSONResponse({"detail": "Engineer access required"}, status_code=403)
-    if path.startswith("/api/mining") and role == "BRANCH_MANAGER":
-        return JSONResponse({"detail": "Investigator access required"}, status_code=403)
+    if path == '/api/mining/rules' and role != 'DATA_ENGINEER':
+        return JSONResponse({'detail':'Engineer access required'}, status_code=403)
     if path.startswith("/api/stream/control") and role == "BRANCH_MANAGER":
         return JSONResponse({"detail": "Investigator access required"}, status_code=403)
     return await call_next(request)
@@ -82,3 +90,5 @@ app.include_router(ingest_router)
 app.include_router(admin_router)
 app.include_router(ws_router)
 app.include_router(stream_control_router)
+app.include_router(alerts_router)
+app.include_router(learning_router)

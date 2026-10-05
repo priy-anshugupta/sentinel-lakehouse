@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 from app.warehouse.connection import get_connection
 from app.models.schemas import KPIMetrics
 from app.config import WAREHOUSE_PATH
+from app.intelligence.model_lab import saved_report
 
 router = APIRouter()
 
@@ -58,7 +59,7 @@ async def get_kpis(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/metrics/overview")
-async def get_overview():
+async def get_overview(request: Request):
     """One consistent, labelled warehouse snapshot for the manager landing page."""
     con = get_connection()
     totals = con.execute("""
@@ -67,7 +68,8 @@ async def get_overview():
           coalesce(sum(is_fraud_pred),0) AS flagged,
           coalesce(sum(CASE WHEN is_fraud_actual=1 AND is_fraud_pred=1 THEN 1 ELSE 0 END),0) AS true_positives,
           min(step_number) AS first_step, max(step_number) AS last_step,
-          max(ingested_at) AS last_ingested
+          max(ingested_at) AS last_ingested,
+          count(*) FILTER (WHERE is_fraud_actual IS NOT NULL AND is_fraud_pred=1) AS labelled_flags
         FROM fact_transactions
     """).fetchone()
     types = con.execute("""
@@ -86,11 +88,26 @@ async def get_overview():
         GROUP BY t.week_number ORDER BY t.week_number
     """).fetchall()
     drift = con.execute("SELECT count(*) FROM fact_drift_events").fetchone()[0]
+    daily = con.execute('''SELECT t.day_number AS day,count(*) AS transactions,
+        coalesce(sum(f.amount),0) AS amount,coalesce(sum(f.is_fraud_actual),0) AS confirmed
+        FROM fact_transactions f JOIN dim_time t ON f.time_key=t.time_key GROUP BY 1 ORDER BY 1''').fetchall()
+    activity = con.execute('''SELECT d.type_name AS type,t.period_of_day AS period,count(*) AS transactions
+        FROM fact_transactions f JOIN dim_time t ON f.time_key=t.time_key
+        JOIN dim_transaction_type d ON f.type_key=d.type_key GROUP BY 1,2''').fetchall()
+    versions = con.execute('''SELECT coalesce(model_version,'Not scored') AS version,count(*) AS transactions,
+        coalesce(sum(is_fraud_pred),0) AS flagged FROM fact_transactions GROUP BY 1 ORDER BY 2 DESC''').fetchall()
+    report = saved_report(con, 'classification')
     return {
         "source": "PaySim synthetic sample in DuckDB",
         "grain": "One row per ingested transaction",
-        "summary": dict(zip(("transactions","amount","confirmed","flagged","true_positives","first_step","last_step","last_ingested"), totals)),
+        "summary": dict(zip(("transactions","amount","confirmed","flagged","true_positives","first_step","last_step","last_ingested","labelled_flags"), totals)),
         "by_type": [dict(zip(("type","transactions","confirmed","flagged","amount"), r)) for r in types],
         "by_week": [dict(zip(("period","transactions","confirmed","flagged"), r)) for r in trend],
         "drift_events": drift,
+        "by_day": [dict(zip(('day','transactions','amount','confirmed'), r)) for r in daily],
+        "activity": [dict(zip(('type','period','transactions'), r)) for r in activity],
+        "prediction_versions": [dict(zip(('version','transactions','flagged'), r)) for r in versions],
+        "active_model": {'version': request.app.state.classifier.version,
+                         'algorithm': 'CART decision tree', 'metrics': report['metrics'] if report else None,
+                         'split': report['split'] if report else None},
     }
