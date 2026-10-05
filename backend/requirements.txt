@@ -7,3 +7,5 @@ pandas
 numpy
 python-multipart
 aiofiles
+scikit-learn>=1.5,<2
+joblib

@@ -1,163 +1,75 @@
-import os
-import pandas as pd
-from river import tree, metrics, utils
-from app.config import DATA_DIR
-import logging
+"""Warehouse-trained CART classifier. The class name preserves ingest callers."""
+from collections import deque
+import numpy as np
 
-logger = logging.getLogger(__name__)
+TYPES = ['PAYMENT', 'TRANSFER', 'CASH_OUT', 'DEBIT', 'CASH_IN']
+FEATURES = ['Amount', 'Origin balance change', 'Destination balance change'] + [f'Type: {t}' for t in TYPES]
+
+
+def feature_matrix(frame):
+    numeric = frame[['amount', 'orig_balance_delta', 'dest_balance_delta']].to_numpy(dtype=float)
+    categories = np.column_stack([(frame['type'] == t).to_numpy(dtype=float) for t in TYPES])
+    return np.column_stack([numeric, categories])
+
+
+class RollingMetric:
+    def __init__(self, kind):
+        self.kind = kind
+        self.values = deque(maxlen=500)
+
+    def update(self, actual, prediction):
+        self.values.append((actual, prediction))
+
+    def get(self):
+        if not self.values:
+            return 0.0
+        if self.kind == 'accuracy':
+            return sum(a == p for a, p in self.values) / len(self.values)
+        tp = sum(a == p == 1 for a, p in self.values)
+        denominator = sum(a == 1 for a, _ in self.values) + sum(p == 1 for _, p in self.values)
+        return 2 * tp / denominator if denominator else 0.0
+
 
 class StreamClassifier:
-    def __init__(self, warm_start: bool = True):
-        try:
-            self.model = tree.HoeffdingTreeClassifier(
-                grace_period=20,
-                delta=1e-5,
-                leaf_prediction='nb'
-            )
-            self.rolling_accuracy = utils.Rolling(metrics.Accuracy, window_size=500)
-            self.rolling_f1 = utils.Rolling(metrics.F1, window_size=500)
-            self.total_samples = 0
+    def __init__(self, warm_start=True):
+        self.model = None
+        self.version = None
+        self.total_samples = 0
+        self.rolling_accuracy = RollingMetric('accuracy')
+        self.rolling_f1 = RollingMetric('f1')
 
-            if warm_start:
-                self._warm_start()
-        except Exception as e:
-            logger.error(f"Failed to initialize StreamClassifier: {e}")
-            raise
+    def activate(self, model, version):
+        self.model, self.version = model, version
+        self.total_samples = 0
+        self.rolling_accuracy = RollingMetric('accuracy')
+        self.rolling_f1 = RollingMetric('f1')
 
-    def _warm_start(self):
-        try:
-            csv_path = os.path.join(DATA_DIR, "paysim.csv")
-            if os.path.exists(csv_path):
-                df = pd.read_csv(csv_path)
-                for _, row in df.iterrows():
-                    row_dict = row.to_dict()
-                    x = self._extract_features(row_dict)
-                    y = int(row_dict.get('isFraud', 0))
-                    
-                    # Prequential evaluation: predict honestly BEFORE learning
-                    y_prob_dict = self.model.predict_proba_one(x)
-                    model_prob = float(y_prob_dict.get(1, 0.0))
-                    domain_prob = self._compute_domain_score(row_dict)
-                    cal_prob = (0.5 * model_prob) + (0.5 * domain_prob)
-                    y_pred = 1 if (cal_prob >= 0.50 or domain_prob >= 0.70) else 0
-
-                    self.rolling_accuracy.update(y, y_pred)
-                    self.rolling_f1.update(y, y_pred)
-                    
-                    # Learn with class balancing
-                    w = 50.0 if y == 1 else 1.0
-                    self.model.learn_one(x, y, w=w)
-                    self.total_samples += 1
-                logger.info(f"StreamClassifier warm-started on {len(df)} PaySim samples with prequential metrics.")
-        except Exception as e:
-            logger.warning(f"Warm start fallback: {e}")
-
-    def _compute_domain_score(self, features: dict) -> float:
+    def predict_and_learn(self, features, label=None):
+        # Compatibility name only: CART weights never update during ingestion.
+        if self.model is None:
+            raise ValueError('Train a decision tree in Model lab before scoring transactions.')
         tx_type = str(features.get('type', '')).upper()
-        amt = float(features.get('amount', 0.0))
-        old_orig = float(features.get('oldbalanceOrg', 0.0))
-        new_orig = float(features.get('newbalanceOrig', 0.0))
-        old_dest = float(features.get('oldbalanceDest', 0.0))
-        new_dest = float(features.get('newbalanceDest', 0.0))
+        values = [float(features.get('amount', 0)),
+                  float(features.get('newbalanceOrig', 0)) - float(features.get('oldbalanceOrg', 0)),
+                  float(features.get('newbalanceDest', 0)) - float(features.get('oldbalanceDest', 0))]
+        values += [float(tx_type == t) for t in TYPES]
+        x = np.array([values])
+        if not np.isfinite(x).all() or values[0] < 0 or tx_type not in TYPES:
+            raise ValueError('Invalid transaction features')
+        probabilities = self.model.predict_proba(x)[0]
+        class_index = list(self.model.classes_).index(1) if 1 in self.model.classes_ else None
+        probability = float(probabilities[class_index]) if class_index is not None else 0.0
+        prediction = int(self.model.predict(x)[0])
+        error = None
+        if label is not None:
+            error = int(prediction != label)
+            self.rolling_accuracy.update(label, prediction)
+            self.rolling_f1.update(label, prediction)
+            self.total_samples += 1
+        return {'prediction': prediction, 'fraud_probability': round(probability, 4),
+                'error': error, 'accuracy': self.rolling_accuracy.get() if self.total_samples else None,
+                'f1': self.rolling_f1.get() if self.total_samples else None,
+                'total_samples': self.total_samples, 'model_version': self.version}
 
-        score = 0.02
-        
-        # Account drain pattern (classic PaySim fraud signature)
-        if tx_type in ('TRANSFER', 'CASH_OUT'):
-            if old_orig > 0 and new_orig == 0:
-                score += 0.72 # Strong drain signal
-            elif old_orig > 0 and (new_orig / old_orig) < 0.1:
-                score += 0.52 # Heavy drain signal
-            
-            # Exact amount empty
-            if old_orig > 0 and abs(old_orig - amt) < 1.0:
-                score += 0.15
-            
-            # High amount
-            if amt > 200000:
-                score += 0.10
-            elif amt > 50000:
-                score += 0.05
-                
-            # Suspicious destination (zero prior balance)
-            if old_dest == 0 and new_dest == 0:
-                score += 0.08
-                
-        elif tx_type == 'PAYMENT':
-            score = 0.01
-            if amt > 100000:
-                score += 0.05
-        elif tx_type == 'CASH_IN':
-            score = 0.01
-            
-        return min(0.99, max(0.01, score))
-    
-    def predict_and_learn(self, features: dict, label: int | None = None) -> dict:
-        try:
-            # Extract numeric features from raw transaction
-            x = self._extract_features(features)
-            
-            # Predict from online tree
-            y_prob_dict = self.model.predict_proba_one(x)
-            model_prob = float(y_prob_dict.get(1, 0.0))
-
-            # Compute domain heuristic score
-            domain_prob = self._compute_domain_score(features)
-            
-            # Calibrated ensemble: predict WITHOUT label leakage
-            if domain_prob >= 0.70 or model_prob >= 0.55:
-                calibrated_prob = max(domain_prob, model_prob)
-                pred = 1
-            else:
-                calibrated_prob = (0.5 * model_prob) + (0.5 * domain_prob)
-                pred = 1 if calibrated_prob >= 0.50 else 0
-            
-            # Prequential evaluation & cost-sensitive online learning
-            if label is not None:
-                error = int(pred != label)
-                self.rolling_accuracy.update(label, pred)
-                self.rolling_f1.update(label, pred)
-                self.total_samples += 1
-                w = 50.0 if label == 1 else 1.0
-                self.model.learn_one(x, label, w=w)
-            else:
-                error = None
-            
-            raw_acc = self.rolling_accuracy.get() if self.total_samples > 10 else None
-            raw_f1 = self.rolling_f1.get() if self.total_samples > 10 else None
-            
-            return {
-                'prediction': int(pred),
-                'fraud_probability': round(float(calibrated_prob), 4),
-                'error': error,
-                'accuracy': round(float(raw_acc), 4) if raw_acc is not None else None,
-                'f1': round(float(raw_f1), 4) if raw_f1 is not None else None,
-                'total_samples': self.total_samples
-            }
-        except Exception as e:
-            logger.error(f"Error in predict_and_learn: {e}")
-            raise RuntimeError("Transaction scoring failed") from e
-    
-    def _extract_features(self, raw: dict) -> dict:
-        try:
-            type_mapping = {'PAYMENT': 0, 'TRANSFER': 1, 'CASH_OUT': 2, 'DEBIT': 3, 'CASH_IN': 4}
-            old_orig = float(raw.get('oldbalanceOrg', 0))
-            new_orig = float(raw.get('newbalanceOrig', 0))
-            old_dest = float(raw.get('oldbalanceDest', 0))
-            new_dest = float(raw.get('newbalanceDest', 0))
-            return {
-                'type_encoded': type_mapping.get(raw.get('type', ''), 0),
-                'amount': float(raw.get('amount', 0)),
-                'oldbalanceOrg': old_orig,
-                'newbalanceOrig': new_orig,
-                'oldbalanceDest': old_dest,
-                'newbalanceDest': new_dest,
-                'balance_delta_orig': new_orig - old_orig,
-                'balance_delta_dest': new_dest - old_dest,
-            }
-        except (ValueError, TypeError) as e:
-            logger.error(f"Error extracting features: {e}")
-            raise ValueError("Invalid transaction features") from e
-    
     def reset(self):
-        self.__init__()
+        self.activate(self.model, self.version)
