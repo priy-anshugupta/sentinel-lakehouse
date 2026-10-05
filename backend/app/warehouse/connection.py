@@ -11,12 +11,19 @@ def get_connection():
         WAREHOUSE_PATH.parent.mkdir(parents=True, exist_ok=True)
         if not WAREHOUSE_PATH.exists() and WAREHOUSE_SEED_PATH.exists() and WAREHOUSE_PATH.resolve() != WAREHOUSE_SEED_PATH.resolve():
             shutil.copyfile(WAREHOUSE_SEED_PATH, WAREHOUSE_PATH)
-        _conn = duckdb.connect(str(WAREHOUSE_PATH))
+        # Attach from an existing in-memory default database. DuckDB 1.5.x WAL
+        # replay after schema changes can fail when opened as the default database.
+        # Attaching lets it replay the intact WAL without discarding committed data.
+        _conn = duckdb.connect(':memory:')
+        escaped_path = str(WAREHOUSE_PATH.resolve()).replace("'", "''")
+        _conn.execute(f"ATTACH '{escaped_path}' AS sentinel")
+        _conn.execute('USE sentinel')
     return _conn
 
 def init_warehouse():
     conn = get_connection()
     create_schema(conn)
+    conn.execute('CHECKPOINT sentinel')
     return conn
 
 def close_connection():

@@ -1,6 +1,17 @@
 import duckdb
 
 def create_schema(con: duckdb.DuckDBPyConnection):
+    con.execute('''CREATE TABLE IF NOT EXISTS mining_runs (
+        run_id VARCHAR PRIMARY KEY, kind VARCHAR, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        report_json VARCHAR)''')
+    con.execute('''CREATE TABLE IF NOT EXISTS fact_model_evaluations (
+        run_id VARCHAR, tx_id INTEGER, actual INTEGER, predicted INTEGER, score DOUBLE,
+        PRIMARY KEY(run_id, tx_id))''')
+    con.execute('''CREATE TABLE IF NOT EXISTS fact_cluster_assignments (
+        run_id VARCHAR, tx_id INTEGER, cluster INTEGER, PRIMARY KEY(run_id, tx_id))''')
+    con.execute('''CREATE TABLE IF NOT EXISTS ingestion_runs (
+        batch_id VARCHAR PRIMARY KEY, source VARCHAR, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        total INTEGER, valid INTEGER, rejected INTEGER)''')
     # Sequences
     con.execute("CREATE SEQUENCE IF NOT EXISTS tx_seq START 1;")
     con.execute("CREATE SEQUENCE IF NOT EXISTS drift_seq START 1;")
@@ -81,6 +92,7 @@ def create_schema(con: duckdb.DuckDBPyConnection):
     """)
     
     # fact_drift_events
+    con.execute("ALTER TABLE fact_transactions ADD COLUMN IF NOT EXISTS model_version VARCHAR DEFAULT 'legacy-online'")
     con.execute("""
         CREATE TABLE IF NOT EXISTS fact_drift_events (
             drift_id INTEGER PRIMARY KEY DEFAULT nextval('drift_seq'),
@@ -96,3 +108,4 @@ def create_schema(con: duckdb.DuckDBPyConnection):
             rules_json VARCHAR
         );
     """)
+    con.execute("ALTER TABLE fact_drift_events ADD COLUMN IF NOT EXISTS model_version VARCHAR DEFAULT 'legacy-online'")

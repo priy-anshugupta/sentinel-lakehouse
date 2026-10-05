@@ -24,6 +24,8 @@ venv/
 *.duckdb.wal
 *.duckdb.tmp
 backend/data/sentinel_runtime.duckdb
+backend/data/models/
+backend/data/recovery-*/
 
 # IDE / Editor
 .vscode/
