@@ -20,7 +20,7 @@ async def websocket_endpoint(websocket: WebSocket):
     simulator = app_state.simulator
     con = get_connection()
     
-    speed_state = {"val": 200}
+    speed_state = app_state.stream_speed
     streaming_task = None
     
     async def stream_data():
@@ -36,7 +36,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         tx_input,
                         app_state.classifier,
                         app_state.drift_detector,
-                        con
+                        con,
+                        is_injected=simulator.is_injected,
                     )
                     
                     # Push result to frontend
@@ -44,9 +45,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         "type": "transaction",
                         "data": {
                             **tx_dict,
+                            "tx_id": result.tx_id,
                             "fraud_probability": result.fraud_probability,
                             "is_fraud_prediction": result.verdict,
-                            "drift_detected": result.drift_detected
+                            "drift_detected": result.drift_detected,
+                            "model_version": result.model_version
                         }
                     })
                     
@@ -69,8 +72,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_json({
                             "type": "drift_alert",
                             "data": {
-                                "message": "Concept Drift Detected!",
-                                "step": tx_input.step
+                                "message": f"The model's prediction errors changed around simulation step {tx_input.step}.",
+                                "step": tx_input.step,
+                                "drift_id": result.drift_id,
                             }
                         })
                         
@@ -89,6 +93,8 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception as e:
             print(f"Streaming error: {e}")
             await websocket.send_json({"type": "error", "message": str(e)})
+        finally:
+            app_state.stream_state = 'PAUSED'
 
     try:
         while True:
@@ -98,19 +104,28 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if action == "start":
                 if streaming_task is None or streaming_task.done():
+                    if app_state.stream_task and not app_state.stream_task.done():
+                        await websocket.send_json({'type':'error','message':'Another monitor is already replaying this warehouse. Pause it first.'})
+                        continue
                     streaming_task = asyncio.create_task(stream_data())
+                    app_state.stream_task = streaming_task
+                    app_state.stream_state = 'RUNNING'
             
             elif action in ("stop", "pause"):
                 if streaming_task and not streaming_task.done():
                     streaming_task.cancel()
+                    await streaming_task
+                app_state.stream_state = 'PAUSED'
             
             elif action == "set_speed":
-                speed_state["val"] = int(msg.get("speed", 200))
+                speed_state["val"] = max(50,min(1000,int(msg.get("speed",200))))
                 
             elif action == "reset":
                 if streaming_task and not streaming_task.done():
                     streaming_task.cancel()
+                    await streaming_task
                 simulator.reset()
+                app_state.stream_state = 'IDLE'
                 await websocket.send_json({
                     "type": "metrics",
                     "data": {
@@ -122,11 +137,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
             elif action in ("inject", "inject_drift", "inject_shift"):
+                if user['role'] != 'DATA_ENGINEER':
+                    await websocket.send_json({'type':'error','message':'Engineer access required for simulation scenarios.'})
+                    continue
                 simulator.arm_drift()
                 await websocket.send_json({
-                    "type": "drift_alert",
+                    "type": "simulation_notice",
                     "data": {
-                        "message": "Fraud shift injected at Step " + str(simulator.current_step),
+                        "message": "A simulated change is armed for subsequent fraud-labelled rows. This is not a detected drift event.",
                         "step": simulator.current_step
                     }
                 })
@@ -134,3 +152,4 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         if streaming_task and not streaming_task.done():
             streaming_task.cancel()
+            await streaming_task
