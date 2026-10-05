@@ -20,7 +20,7 @@ export const useOlapQuery = (params, debounceMs = 200) => {
     try {
       let result;
       if (queryParams.operation === 'PIVOT') {
-        result = await fetchPivotQuery({
+        result = await fetchPivotQuery({ ...queryParams,
           row_dim: queryParams.row_dim || 'day_of_week',
           col_dim: queryParams.col_dim || 'type_name',
           measure: queryParams.measure || 'sum_amount'

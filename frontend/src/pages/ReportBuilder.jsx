@@ -1,3 +1,4 @@
+import { useRole } from '../context/RoleContext';
 import React, { useEffect, useState } from 'react';
 import { Download, FileText, Printer, Search } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -35,6 +36,8 @@ const presetReport = preset => ({
 });
 
 export default function ReportBuilder() {
+  const {role}=useRole();
+  const technical=role==='DATA_ENGINEER';
   const [active, setActive] = useState(() => presetReport(presets[0]));
   const [draft, setDraft] = useState('');
   const [promptError, setPromptError] = useState('');
@@ -83,7 +86,7 @@ export default function ReportBuilder() {
   }
 
   return <div className="report-page">
-    <div className="page-intro"><span className="eyebrow">REPORTING</span><h1>Ask a business question</h1><p>Describe the period and measure you need. The report shows how your request becomes an OLAP query against the transaction warehouse.</p></div>
+    <div className="page-intro"><span className="eyebrow">REPORTING</span><h1>Ask a business question</h1><p>{technical?'Describe a period and measure; inspect the OLAP query behind the report.':'Describe the period and information you need. Review the selected scope, then export your results.'}</p></div>
 
     <section className="surface-card report-ask" aria-labelledby="report-ask-title">
       <div className="report-ask-heading"><span className="preset-icon"><Search size={20}/></span><div><h2 id="report-ask-title">Ask in plain language</h2><p>Use simulated time, transaction type, confirmed fraud, or amount.</p></div></div>
@@ -99,8 +102,8 @@ export default function ReportBuilder() {
     <div className="report-template-heading"><h2>Or start with a common report</h2></div>
     <div className="preset-grid">{presets.map(item => <button key={item.id} className={`preset-card ${active.id === item.id ? 'selected' : ''}`} onClick={() => selectPreset(item)}><span className="preset-icon"><FileText size={19}/></span><strong>{item.title}</strong><small>{item.description}</small></button>)}</div>
 
-    <section className="surface-card report-result"><div className="card-heading"><div><span className="eyebrow">WAREHOUSE REPORT</span><h3>{active.title}</h3><p>{active.description}</p></div><div className="report-actions"><button className="subtle-button" onClick={exportCsv} disabled={!rows.length || loading}><Download size={15}/>CSV</button><button className="subtle-button" onClick={() => window.print()} disabled={!rows.length || loading}><Printer size={15}/>Print</button></div></div>
-      <div className="report-scope"><strong>Interpreted as</strong>{active.interpretation.map(item => <span key={item}>{item}</span>)}</div>
+    <section className="surface-card report-result"><div className="card-heading"><div><span className="eyebrow">{technical?'WAREHOUSE REPORT':'YOUR REVIEW REPORT'}</span><h3>{active.title}</h3><p>{active.description}</p></div><div className="report-actions"><button className="subtle-button" onClick={exportCsv} disabled={!rows.length || loading}><Download size={15}/>CSV</button><button className="subtle-button" onClick={() => window.print()} disabled={!rows.length || loading}><Printer size={15}/>Print</button></div></div>
+      <div className="report-scope"><strong>Interpreted as</strong>{active.interpretation.map(item => <span key={item}>{technical?item:item.replace('Roll-up:','Group by:').replace('Slice:','Transaction type:').replace('Dice:','Compare:')}</span>)}</div>
       {active.warning && <div className="report-coverage" role="status">{active.warning}</div>}
       {error ? <div className="data-error" role="alert">Could not build this report: {error}</div> : loading ? <div className="chart-placeholder">Running warehouse query…</div> : rows.length ? <>
         <div className="report-metrics"><div><small>Transactions</small><strong>{formatNumber(total.transactions)}</strong></div><div><small>Confirmed fraud</small><strong>{formatNumber(total.fraud)}</strong></div><div><small>Fraud rate</small><strong>{total.transactions ? `${(total.fraud / total.transactions * 100).toFixed(2)}%` : '—'}</strong></div></div>
@@ -108,8 +111,8 @@ export default function ReportBuilder() {
         <div className="report-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={rows}><CartesianGrid vertical={false} stroke="#e8eeec"/><XAxis dataKey="period" tickFormatter={label} tickLine={false} axisLine={false}/><YAxis tickLine={false} axisLine={false}/><Tooltip labelFormatter={label} formatter={value => amount(value)}/><Bar dataKey={metric} fill="#0b716a" radius={[4, 4, 0, 0]}/></BarChart></ResponsiveContainer></div>
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Period</th><th>Transactions</th><th>Confirmed fraud</th><th>Fraud rate</th><th>Amount · local units</th></tr></thead><tbody>{rows.map(row => <tr key={row.period}><td>{label(row.period)}</td><td>{formatNumber(row.tx_count)}</td><td>{formatNumber(row.fraud_count)}</td><td>{row.tx_count ? `${(row.fraud_count / row.tx_count * 100).toFixed(2)}%` : '—'}</td><td>{amount(row.total_amount)}</td></tr>)}</tbody></table></div>
       </> : <div className="chart-placeholder">No matching warehouse rows. Try another question or import more data.</div>}
-      <details className="report-query"><summary>Show OLAP SQL and definitions</summary><p>Roll-up groups transaction facts by the selected simulated time level. A type or time filter slices those facts before aggregation. Confirmed fraud comes from the PaySim label. One fact row represents one ingested transaction.</p><pre>{sql || 'No query yet.'}</pre></details>
-      <div className="source-note">Source: PaySim synthetic sample in DuckDB. Amounts have no specified currency. Query time: {execTime == null ? '—' : `${execTime.toFixed(1)} ms`}.</div>
+      {technical&&<details className="report-query"><summary>Show OLAP SQL and definitions</summary><p>Roll-up groups transaction facts by the selected simulated time level. A type or time filter slices those facts before aggregation. Confirmed fraud comes from the PaySim label. One fact row represents one ingested transaction.</p><pre>{sql || 'No query yet.'}</pre></details>}
+      <div className="source-note">Source: synthetic PaySim historical records. Amounts have no specified currency. {technical&&<>Query time: {execTime == null ? '—' : `${execTime.toFixed(1)} ms`}.</>}</div>
     </section>
   </div>;
 }
