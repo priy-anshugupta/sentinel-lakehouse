@@ -1,7 +1,7 @@
 export const CHART_THEME = {
   colors: {
-    primary: '#C2703E', // copper
-    secondary: '#2563EB', // signalBlue
+    primary: '#217451', // Sentinel green
+    secondary: '#8fb583', // sage
     fraud: '#DC2626', // threat
     safe: '#16A34A', // safe
     grid: '#F1F5F9', // bone
@@ -38,3 +38,4 @@ export const CHART_THEME = {
     easing: 'ease-out',
   }
 };
+
