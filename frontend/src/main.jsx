@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { RoleProvider } from './context/RoleContext'
 import App from './App.jsx'
 import './index.css'
+import './WorkspaceTheme.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -14,4 +15,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
+
 

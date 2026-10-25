@@ -1,0 +1,57 @@
+/* Shared Sentinel workspace palette. */
+:root{--bg:#f3f6f2;--ink:#173b34;--navy:#153e35;--muted:#718178;--line:#dfe7df;--teal:#0b716a}
+.app-layout{background:var(--bg);color:var(--ink)}
+.app-sidebar{width:246px;min-width:246px;background:#103c34;color:#d6e5dc;border:0}
+.sidebar-brand{height:84px;padding:22px;border-color:#ffffff13;gap:11px}
+.app-sidebar .brand-mark{width:38px;height:41px;background:#d1e7b9;color:#18483a;border-radius:12px;box-shadow:none}
+.app-sidebar .brand-name{color:#fff;font-size:17px;letter-spacing:.12em}
+.app-sidebar .brand-name small{color:#90b5a5;font-size:9px;letter-spacing:.09em;margin-top:5px}
+.workspace-identity{margin:22px 18px 12px;padding:13px 12px;background:#ffffff08;border:1px solid #ffffff14;border-radius:9px}
+.workspace-identity strong{color:#d8e8df;font-size:11px;font-weight:600}
+.workspace-identity small{color:#91b3a4;font-size:10px;line-height:1.7}
+.workspace-dot{background:#c7e3a9;box-shadow:0 0 0 4px #c7e3a910;margin-top:5px}
+.nav-group{margin-top:22px}.nav-label{color:#7eaa96;font-size:8px;letter-spacing:.17em;padding-left:25px}
+.nav-item{margin:5px 14px;padding:12px 13px;gap:12px;border-radius:7px;font-size:12px;color:#afcabe;min-height:43px}
+.nav-item svg{width:18px;color:#7fae96;stroke-width:1.6}
+.nav-item:hover{background:#ffffff0b;color:#fff}.nav-item:hover svg{color:#c7dfb2}
+.nav-item.active{background:#d0e5b9;color:#194b38;font-weight:750;box-shadow:0 5px 12px #001d2010}
+.nav-item.active svg{color:#235c42}.nav-item.active:after{display:none}
+.sidebar-account{padding:19px 18px;border-color:#ffffff16;background:#0d342e;color:#e6efe8}
+.account-avatar{width:36px;height:36px;background:#365e49;color:#daedbf;border:1px solid #6d8b5938;border-radius:11px}
+.account-copy strong{color:#e1ece4;font-size:11px}.account-copy span{color:#88aa98;font-size:10px}.sidebar-account button{color:#9abcab;padding:7px;border-radius:7px}.sidebar-account button:hover{color:#fff;background:#ffffff0b}.sidebar-close{color:#b5d0bf}
+.app-topbar{height:84px;padding:0 34px;background:#ffffffed;border-color:#e1e9df;backdrop-filter:blur(15px)}
+.breadcrumb{gap:12px;color:#85988a;font-size:11px}.breadcrumb strong{color:#214a3c;font-size:12px;font-weight:650}.breadcrumb-separator{color:#c2cfc2}
+.topbar-right{gap:18px}.environment-badge{border:1px solid #dce9d5;background:#f2f7ed;color:#5c7c4e;padding:7px 10px;border-radius:6px;font-size:9px}
+.topbar-profile{border-left:1px solid #e1e8dd;padding-left:18px;gap:10px}.topbar-profile>span{width:36px;height:36px;background:#e6eddf;color:#4c7048;border-radius:11px}.topbar-profile strong{color:#365643;font-size:11px}.topbar-profile small{color:#83947f;font-size:9px}.menu-button{color:#346448}
+.app-content{padding:30px 34px 45px;max-width:1700px;width:100%;margin:0 auto}
+.executive-heading h1{font-size:32px;color:#173e32;font-weight:650;letter-spacing:-.045em}.executive-heading h1 span{color:#5f8e51}.executive-heading .eyebrow{color:#6b8c70;font-size:9px;letter-spacing:.15em}.executive-heading p{color:#7a8a79;font-size:12px}
+.app-layout .primary-button,.app-layout .executive-report{background:#126c52;color:#fff;box-shadow:0 4px 10px #126c5212;border-radius:7px}.app-layout .primary-button:hover,.app-layout .executive-report:hover{background:#0e533f}.app-layout .subtle-button{border-color:#dce5d8;color:#5a7561;border-radius:7px}.app-layout .subtle-button:hover{background:#f0f6ec}
+.dashboard-section-nav{gap:25px;border-color:#dce6d8;margin-bottom:23px}.dashboard-section-nav button{color:#87977f;font-size:11px;padding:13px 0}.dashboard-section-nav button.active{color:#1c6848;border-color:#1c6848}.dashboard-section-nav>span{color:#8b9c85}.status-dot{background:#6b9d63}
+.portfolio-briefing{border-color:#dbe5d5;border-radius:12px;min-height:205px;box-shadow:0 5px 20px #24452a03}.briefing-copy{padding:28px 30px;background:radial-gradient(ellipse at 100% 0,#e6efd9,transparent 75%),#f9fcf6}.briefing-kicker{color:#769267;font-size:8px;letter-spacing:.17em}.briefing-copy h2{color:#214b35;font-weight:600;font-size:29px}.briefing-copy p{color:#7b8b70;font-size:12px}.briefing-copy>a{background:#e3edda;color:#3e6a37;border:1px solid #d7e4cb;border-radius:6px;font-size:10px}.briefing-copy>a:hover{background:#d4e4c6}.briefing-visual{background:linear-gradient(180deg,#103c3410,#103c34e8),url('/images/analyst-review.png') center/cover}.briefing-visual>div>span,.briefing-visual small{color:#c5d9c6}.briefing-data-badge{color:#5b714a;background:#f4f8e8ed}
+.snapshot-heading h2{font-size:14px;font-weight:650;color:#36503b}.snapshot-heading>span{color:#8a9981;font-size:10px}
+.role-dashboard .metric-grid{gap:16px}.role-dashboard .metric-tile{border:1px solid #dfe7d9;border-radius:11px;padding:20px 22px;box-shadow:0 3px 12px #254c2403}.role-dashboard .metric-top{color:#75886e;font-size:11px}.role-dashboard .metric-tile strong{font-size:34px;color:#294e36;font-weight:600}.role-dashboard .metric-tile small{color:#84977a;font-size:10px}.role-dashboard .metric-icon{background:#eff5e8;color:#73915f;border-radius:10px}.role-dashboard .metric-tile:first-child{background:linear-gradient(125deg,#1e5a41,#103e32);border-color:#245a40;box-shadow:0 5px 15px #23492c10}.role-dashboard .metric-tile:first-child strong{color:#fff}.role-dashboard .metric-tile:first-child .metric-top>span:first-child{color:#cae2b7}.role-dashboard .metric-tile:first-child small{color:#a6c39d}.role-dashboard .metric-tile:first-child .metric-icon{background:#ffffff12;color:#d0e8af}.role-dashboard .metric-tile.red .metric-icon{background:#fcf0ec;color:#bf8578}.role-dashboard .metric-tile.amber .metric-icon{background:#fcf5e7;color:#bd9758}.role-dashboard .metric-tile.teal .metric-icon{background:#eff5e8;color:#73915f}
+.executive-context summary{color:#718769}.executive-context summary>span{color:#8c9c83}.role-dashboard .surface-card{border-color:#dfe7d9;border-radius:12px;box-shadow:0 5px 18px #26462c03}.role-dashboard .card-heading h3{color:#31513b;font-size:16px;font-weight:650}.role-dashboard .eyebrow{color:#7c9670;letter-spacing:.12em}.role-dashboard .card-heading p{color:#819276}.role-dashboard .volume-summary strong{color:#315238}.role-dashboard .volume-summary span{color:#879a7d}.role-dashboard .executive-volume .segmented{background:#f0f5ea}.role-dashboard .executive-volume .segmented .selected{color:#276444}.chart-footer a,.card-heading>a{color:#39764b}.chart-footer>span{color:#8a9b81}
+.review-focus{background:linear-gradient(135deg,#e4eedb,#f0f5e9);border-color:#d6e2cb;border-radius:12px;color:#375f3b}.review-focus .eyebrow{color:#80976e}.review-focus h3{color:#315334;font-weight:550}.review-focus>p{color:#7c906f}.focus-icon{background:#ffffff70;border-color:#cbdabe;color:#75955e}.focus-row{border-color:#d6e1ca}.focus-number{color:#8fa77e}.focus-row strong{color:#4c7142}.focus-row small{color:#829777}.focus-row>svg{color:#7e9c6c}.focus-row:hover strong{color:#194e30}.focus-foot{color:#8a9f7e}
+.role-dashboard .activity-heatmap>span{color:#82987a}.role-dashboard .activity-heatmap .activity-type{color:#56734c}.role-dashboard .data-table th{background:#f3f7ee;color:#7c9273}.role-dashboard .data-table td{color:#6f8465;border-color:#edf2e7}.role-dashboard .data-table td:first-child{color:#42663f}.role-dashboard .transaction-toolbar label{background:#fafcf7;border-color:#e0e8d7}.role-dashboard .transaction-toolbar>span{color:#8a9b80}.role-dashboard .decision-card{background:#eaf1e0;border-color:#d8e3cb}.role-dashboard .decision-copy h3{color:#3b6137}.role-dashboard .decision-copy p{color:#7e9671}.role-dashboard .decision-copy a{color:#397442}.business-source-note{color:#8c9d81}
+.app-layout .olap-operations button.selected{background:#186d4f;border-color:#186d4f}.app-layout .olap-operation-story{background:#edf4e6;border-color:#dbe6ce;color:#71886a}.app-layout .olap-operation-story strong{color:#497642}.app-layout .metric-tabs button.selected{color:#327341;border-color:#69965b}.app-layout .report-page .preset-card.selected{background:#f0f6e9;border-color:#9eba82}.app-layout .report-page .report-ask,.app-layout .report-page .report-scope{border-color:#dde7d4}.app-layout .report-page .report-scope{background:#f4f8ee}.app-layout .report-page .report-ask-row button{background:#176b4d}.app-layout .lab-banner{background:linear-gradient(120deg,#153e33,#296443)}.app-layout .lab-tabs .selected{color:#216d46;border-color:#6a985c;background:#eef5e7}.app-layout .page-intro h1{color:#214a35}
+@media(max-width:850px){.app-topbar{height:70px;padding:0 18px}.app-content{padding:23px 17px 40px}.app-sidebar{width:246px;min-width:246px}.topbar-profile>div{display:none}.topbar-profile{padding-left:12px}.topbar-right{gap:10px}.breadcrumb>span:first-child,.breadcrumb-separator{display:none}}
+@media(max-width:600px){.environment-badge{display:none}.dashboard-section-nav{gap:18px}.dashboard-section-nav>span{display:none}.executive-heading h1{font-size:29px}.briefing-copy{padding:23px}.briefing-copy h2{font-size:25px}.role-dashboard .metric-tile{padding:16px}.role-dashboard .metric-tile strong{font-size:28px}.role-dashboard .metric-top{font-size:10px}.role-dashboard .metric-grid{gap:10px}}
+
+/* Compact charcoal navigation with quiet amber accents. */
+.app-sidebar{width:236px;min-width:236px;background:#232321;color:#c7c5bf;border-right:1px solid #ffffff08}
+.sidebar-brand{height:84px;padding:22px 23px;border-color:#ffffff0b;gap:11px}
+.app-sidebar .brand-mark{width:34px;height:38px;background:#d3b17b;color:#282720;border-radius:10px}
+.app-sidebar .brand-name{font-size:16px;color:#faf9f6;letter-spacing:.12em}.app-sidebar .brand-name small{font-size:8px;letter-spacing:.08em;color:#96948c;margin-top:4px}
+.workspace-identity{margin:20px 19px 16px;padding:0 4px 18px;background:transparent;border:0;border-bottom:1px solid #ffffff10;border-radius:0;gap:10px;align-items:center}
+.workspace-identity .workspace-dot{width:5px;height:5px;background:#d3b17b;box-shadow:0 0 0 4px #d3b17b0b;margin:0}
+.workspace-identity small{font-size:7px;letter-spacing:.13em;color:#77766e;margin:0 0 6px;line-height:1}
+.workspace-identity strong{font-size:11px;font-weight:550;color:#cecbc2;line-height:1.5}
+.sidebar-scroll{padding:0 12px 18px;scrollbar-width:none}.sidebar-scroll::-webkit-scrollbar{display:none}
+.nav-group{margin:0 0 23px}.nav-label{font-size:7px;letter-spacing:.16em;color:#75756e;padding:0 13px 8px;font-weight:650}
+.nav-item{margin:3px 0;padding:11px 12px;min-height:40px;gap:11px;border:1px solid transparent;border-radius:7px;color:#aaa99f;font-size:11px;font-weight:450}
+.nav-item svg{width:16px;height:16px;color:#757970;stroke-width:1.6}
+.nav-item:hover{background:#ffffff06;color:#f1eee7}.nav-item:hover svg{color:#c6baa3}
+.nav-item.active{background:#d3b17b12;border:1px solid #d3b17b24;box-shadow:none;color:#e4c99e;font-weight:600}
+.nav-item.active svg{color:#d3b17b;stroke-width:1.8}.nav-item.active:after{display:none}
+.sidebar-account{padding:17px 19px;background:#1e1e1c;border-color:#ffffff0c;gap:10px}.account-avatar{width:32px;height:34px;border-radius:9px;background:#39372f;color:#c8b590;border:1px solid #ffffff08;font-size:11px}.account-copy strong{font-size:10px;color:#d4d0c7;font-weight:550}.account-copy span{font-size:9px;color:#777a70;margin-top:4px}.sidebar-account button{color:#8b8b7f;padding:7px}.sidebar-account button:hover{color:#d3b17b;background:#ffffff06}.sidebar-close{color:#a8a698}
+@media(max-width:850px){.app-sidebar{width:236px;min-width:236px}}
